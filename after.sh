@@ -103,5 +103,5 @@ if test -f "$FILE"; then
 	chmod +rwx $FILE
 	sh $FILE
 else 
-	echo echo "Install Completed. "
+	echo "Install Completed. "
 fi
