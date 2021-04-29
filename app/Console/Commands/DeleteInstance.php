@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 
+use App\Models\Instance;
+
 class DeleteInstance extends Command
 {
     /**
@@ -11,7 +13,7 @@ class DeleteInstance extends Command
      *
      * @var string
      */
-    protected $signature = 'command:name';
+    protected $signature = 'acm:delete-instance {id}';
 
     /**
      * The console command description.
@@ -37,6 +39,8 @@ class DeleteInstance extends Command
      */
     public function handle()
     {
-        return 0;
+        $id = $this->argument('id');
+
+        $instance = Instance::destroy($id);
     }
 }

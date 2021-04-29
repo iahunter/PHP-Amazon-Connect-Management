@@ -16,4 +16,17 @@ class Company extends Model
 		'description',
 		'json',
 	];
+
+	public static function names()
+	{
+		$companies = Company::all();
+
+		$names = [];
+		foreach($companies as $company)
+		{
+			$names[] = $company->name;
+		}
+
+		return $names;
+	}
 }

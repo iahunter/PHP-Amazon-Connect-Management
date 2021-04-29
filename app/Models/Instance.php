@@ -13,7 +13,9 @@ class Instance extends Model
 	
 	protected $fillable = [
 		'name',
-		'account',
+		'account_id',
 		'instance_id',
+		'region',
+		'json'
 	];
 }

@@ -50,7 +50,7 @@ class CreateInstance extends Command
             $this->instance_name = $this->ask('What is the Instance Name?', 'test');
         }
 		if (empty($this->account)) {
-			$companies = Company::all()-get(); 
+			$companies = Company::all(); 
 			print($companies); 
 			
             $this->account = $this->choice(
