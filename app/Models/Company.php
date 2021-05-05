@@ -29,4 +29,9 @@ class Company extends Model
 
 		return $names;
 	}
+
+	public function accounts()
+	{
+		return $this->hasMany(Account::class);
+	}
 }

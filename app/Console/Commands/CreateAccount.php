@@ -49,7 +49,6 @@ class CreateAccount extends Command
                                 'account_app_key' => $this->account_app_key,
                                 'account_app_secret' => $this->account_app_secret,
                             ]);
-
         print_r($a);
     }
 	
@@ -81,7 +80,7 @@ class CreateAccount extends Command
         }
 
         if (empty($this->account_app_secret)) {
-            $this->account_app_secret = $this->ask('What is the Account App Secret');
+            $this->account_app_secret = $this->secret('What is the Account App Secret');
             
             // Encrypt the Secret 
             $this->account_app_secret = Crypt::encryptString($this->account_app_secret); 

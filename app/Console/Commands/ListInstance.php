@@ -3,15 +3,15 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-
-use Aws\Connect\ConnectClient;
-use App\Models\Instance;
-use App\Models\Account;
-use App\Models\Company;
-
 use Illuminate\Support\Facades\Crypt;
 
-class GetInstance extends Command
+use Aws\Connect\ConnectClient;
+
+use App\Models\Company;
+use App\Models\Account;
+use App\Models\AmazonConnect\Instance;
+
+class ListInstance extends Command
 {
     /**
      * The name and signature of the console command.
@@ -95,9 +95,14 @@ class GetInstance extends Command
                 ],
             ]);
             
-    
-            $result = $client->listInstances();
-            //print_r($result);
+            try{
+                $result = $client->listInstances();
+                //print_r($result);
+            }catch(Exception $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+            
             
             foreach($result['InstanceSummaryList'] as $instance){
                 //print_r($instance);
@@ -137,23 +142,75 @@ class GetInstance extends Command
                     $storage[$type] = $getresult['StorageConfigs']; 
                     //print_r($getresult);
                 }
-    
-                $instance['InstanceStorageConfigs'] = $storage; 
+
+                $storage_json = json_encode($storage); 
+
+                // Get Custom Flows and Store in the Database
+                $flows = $client->listContactFlows([
+                    'InstanceId' => $instance['Id'],
+                ]);
+
+                //print_r($flows);
+
+                $discard_regex = [
+                    "/^Default/",
+                    "/^Sample/",
+                ];
+
+                $custom_flows = [];
+
+                foreach($flows['ContactFlowSummaryList'] as $flow){
+                    //print_r($flow['Name']);
+                    $found = false;
+                    // Discard Default and Sample Flows
+                    foreach($discard_regex as $regex){
+                        if(preg_match($regex,$flow['Name'])){
+                            $found = true;
+                        }
+                    }
+
+                    if($found == true){
+                        continue;
+                    }else{
+                        print_r($flow);
+                    }
+
+                    // Need to possibly queue these jobs in case they error out. 
+                    try{
+                        $getresult = $client->describeContactFlow([
+                            'ContactFlowId' => $flow['Id'],
+                            'InstanceId' => $instance['Id'],
+                        ]);
+                    }catch(Exception $e){
+                        //echo 'Caught exception: ',  $e->getMessage(), "\n";
+                        echo 'Cannot get contact flow. Moving on.'.PHP_EOL;
+                        continue;
+                    }
+                    
+                    
+                    print_r($getresult);
+                    $custom_flows[] = $getresult['ContactFlow'];
+                }
+                
+                $custom_flows_json = json_encode($custom_flows);
+
+
     
                 $json = json_encode($instance, true); 
     
-                //print_r($json); 
+                print_r($json); 
     
                 $exists = Instance::where('instance_id',$id)->count();
                 print "Found Instance with Name: {$name}".PHP_EOL;
                 if(!$exists){
                     print "Creating New Connect Instance!".PHP_EOL;
-                    $data = Instance::create(['name' => $name, 'instance_id' => $id, 'account_id' => $account, 'region' => $region, 'json' => $json]);
+                    $data = Instance::create(['name' => $name, 'instance_id' => $id, 'account_id' => $account, 'region' => $region, 'flows' => $custom_flows_json, 'storage' => $storage_json, 'json' => $json]);
                     //print_r($data);
     
                     //print_r($instance); 
                 }elseif(Instance::where('json', $json)->count()){
                     print "Needs updated json!";
+
                 }else{
                     print "Nothing Changed... Moving on.".PHP_EOL; 
                 }

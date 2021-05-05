@@ -13,7 +13,7 @@ class CreateCompany extends Command
      *
      * @var string
      */
-    protected $signature = 'acm:create-company';
+    protected $signature = 'acm:create-company {company?} {company_description?}';
 
     /**
      * The console command description.
@@ -39,8 +39,25 @@ class CreateCompany extends Command
      */
     public function handle()
     {
-		$this->prompt(); 
+		if(!$this->argument('company')){
+            $this->company_name = null;
+        }else{
+            $this->company_name = $this->argument('company'); 
+        }
+
+        if(!$this->argument('company_description')){
+            $this->company_description = null;
+        }else{
+            $this->company_description = $this->argument('company_description'); 
+        }
+
+
+        if(!$this->company_name || !$this->company_description){
+            $this->prompt(); 
+        }
         $a = Company::create(['name' => $this->company_name, 'description' => $this->company_description]);
+
+        print_r($a);
     }
 	
 	public function prompt()

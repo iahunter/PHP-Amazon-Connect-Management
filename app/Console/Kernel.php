@@ -16,6 +16,10 @@ class Kernel extends ConsoleKernel
         Commands\CreateInstance::class,
         Commands\CreateCompany::class,
         Commands\CreateAccount::class,
+
+        // AWS 
+        Commands\ListInstance::class,
+        Commands\DeployInstance::class,
     ];
 
     /**

@@ -17,5 +17,9 @@ class Account extends Model
         'account_description',
         'account_app_key',
         'account_app_secret',
-	];
+    ];
+    
+    public function company(){
+        return $this->belongsTo(Company::class, 'foreign_key', 'company_id');
+    }
 }
