@@ -140,7 +140,7 @@ class ListInstance extends Command
                         'ResourceType' => $type,
                     ]);
                     $storage[$type] = $getresult['StorageConfigs']; 
-                    //print_r($getresult);
+                    print_r($getresult);
                 }
 
                 $storage_json = json_encode($storage); 
