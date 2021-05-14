@@ -12,6 +12,7 @@ use Aws\Firehose\FirehoseClient;
 use Aws\S3\S3Client;
 use Aws\S3\S3MultiRegionClient;
 use Aws\Iam\IamClient;
+use Aws\Kms\KmsClient;
 
 use App\Models\Company;
 use App\Models\Account;
@@ -68,8 +69,6 @@ class DeployInstance extends Command
 
         // Add Connect Creation Here. 
 
-        //$ConnectClient = $this->ConnectClient($this->region);
-
         $this->ConnectClient = new ConnectClient([
             'version'     => 'latest',
             'region'      => $this->region,
@@ -78,6 +77,7 @@ class DeployInstance extends Command
                 'secret' => $this->app_secret,
             ],
         ]);
+
 
 
         
@@ -113,23 +113,26 @@ class DeployInstance extends Command
 
         $bucket = "s3-amazonconnect-{$this->instance_name}";
 
-        /* Removed for Testing*/
-        $newbucket = $S3Client->createBucket(['Bucket' => $bucket]);
-
-        print_r($newbucket); 
-
-        
-
-        sleep(10);
-
         $bucketlist = $S3->listBucketsAndRegions();
-
-        print_r($bucketlist);
-        
         if(key_exists($bucket, $bucketlist)){
-            //$newbucket = $S3Client->describeBucket(['Bucket' => $bucket]);
-            print_r($newbucket);
-            print "Bucket {$bucket} Created Successfully...".PHP_EOL;
+            print "Bucket $bucket already exists.".PHP_EOL;
+        }else{
+            /* Removed for Testing*/
+            $newbucket = $S3Client->createBucket(['Bucket' => $bucket]);
+
+            print_r($newbucket); 
+
+            sleep(10);
+
+            $bucketlist = $S3->listBucketsAndRegions();
+
+            print_r($bucketlist);
+            
+            if(key_exists($bucket, $bucketlist)){
+                //$newbucket = $S3Client->describeBucket(['Bucket' => $bucket]);
+                print_r($newbucket);
+                print "Bucket {$bucket} Created Successfully...".PHP_EOL;
+            }
         }
         
         
@@ -138,10 +141,9 @@ class DeployInstance extends Command
             "agent-events",
         ];
 
+        // Loop thru the record types and create stream, policy, role, and firehouse and attach them to connect instance. 
         foreach($recordtypes as $type)
         {
-
-            
 
             echo "###################################################".PHP_EOL;
             echo "         Deploy Connect Kinesis Streams            ".PHP_EOL;
@@ -159,34 +161,43 @@ class DeployInstance extends Command
 
             print_r($streams);
 
-            $stream = [
-                'ShardCount' => 10, // REQUIRED
-                'StreamName' => "ks-$this->instance_name-$type", // REQUIRED
-            ];
+            $stream_name = "ks-$this->instance_name-$type";
 
-            /* Removed for Testing*/ 
-            $result = $KinesisClient->createStream($stream);
+            if(!in_array($stream_name, $streams['StreamNames'])){
+                $stream = [
+                    'ShardCount' => 10, // REQUIRED
+                    'StreamName' => $stream_name, // REQUIRED
+                ];
 
-            print_r($result);
+                /* Removed for Testing*/ 
+                $result = $KinesisClient->createStream($stream);
+
+                print_r($result);
+
+                sleep(5);
             
+                echo "Checking Stream List for new Stream Name: {$stream['StreamName']}".PHP_EOL;
+                
+                $streams = $KinesisClient->listStreams();
 
-            sleep(5);
-            
-            echo "Checking Stream List for new Stream Name: {$stream['StreamName']}".PHP_EOL;
-            
-            $streams = $KinesisClient->listStreams();
+                //print_r($streams);
 
-            print_r($streams);
+                if(in_array($stream_name, $streams['StreamNames'])){
+                    print "Stream: {$stream_name} Created Successfully".PHP_EOL; 
+                    $result = $KinesisClient->describeStreamSummary(['StreamName' => $stream_name]);
+                    $streamname = $result['StreamDescriptionSummary']['StreamName'];
+                    $streamarn = $result['StreamDescriptionSummary']['StreamARN'];
+                    print_r($result); 
+                }
 
-            if(in_array($stream['StreamName'], $streams['StreamNames'])){
-                print "Stream: {$stream['StreamName']} Created Successfully".PHP_EOL; 
-                $result = $KinesisClient->describeStreamSummary(['StreamName' => $stream['StreamName']]);
-                $streamname = $result['StreamDescriptionSummary']['StreamName'];
-                $streamarn = $result['StreamDescriptionSummary']['StreamARN'];
-                print_r($result); 
+                sleep(5);
+            }else{
+                print "Stream already exists. No need to recreate it. ".PHP_EOL;
+
+                $result = $KinesisClient->describeStreamSummary(['StreamName' => $stream_name]);
+                    $streamname = $result['StreamDescriptionSummary']['StreamName'];
+                    $streamarn = $result['StreamDescriptionSummary']['StreamARN'];
             }
-
-            sleep(5);
         
             
             echo "###################################################".PHP_EOL;
@@ -196,199 +207,220 @@ class DeployInstance extends Command
 
             $firehose_name = "fh-$this->instance_name-$type";
 
-            $firehoseperms = [  $IAM->allowDatabase(),
-                                $IAM->allowS3($bucket),
-                                $IAM->allowLambda(),
-                                $IAM->allowLogs($firehose_name),
-                                $IAM->allowDecryptS3(),
-                                $IAM->allowKinesisStreams([$streamarn]),
-                                $IAM->allowDecryptKinesis(),
-            ];
-
-
-            $json = json_encode($firehoseperms,JSON_UNESCAPED_SLASHES);
-
-            $jsonperms = <<<END
-    {
-        "Version":"2012-10-17",
-        "Statement":$json
-    }
-    END;
-            print_r($jsonperms);
-
-            $IamClient = $this->IamClient($this->region);
-
-            //$roles = $IamClient->listRoles();
-            //print_r($roles);
-            
-
-            sleep(10);
-
-            print "Creating Policy.".PHP_EOL;
-
-            $policy_name = "KinesisFirehoseServicePolicy-$this->instance_name-$this->region-$firehose_name";
-            
-            /* Removed for Testing*/
-            $policy = $IamClient->createPolicy([
-                //'Description' => '<string>',
-                //'Path' => '<string>',
-                'PolicyDocument' => $jsonperms, // REQUIRED
-                'PolicyName' => $policy_name, // REQUIRED
-                'Tags' => [
-                    [
-                        'Key' => 'connect', // REQUIRED
-                        'Value' => $this->instance_name, // REQUIRED
-                    ],
-                    
-                ],
-            ]);
-
-            print_r($policy);
-    
-            sleep(10);
-
-            $policies = $IamClient->listPolicies();
-            print_r($policies);
-
-            foreach($policies['Policies'] as $p)
-            {
-                if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
-                {
-                    $arn = $p['Arn'];
-                    print "Found Policy Arn: $arn".PHP_EOL;
-                    //print_r($arn);
-                    break;
-                }
-            }
-
-            sleep(10);
-
-
-            echo "###################################################".PHP_EOL;
-            echo "            Deploy IAM Roles for Firehose          ".PHP_EOL;
-            echo "###################################################".PHP_EOL;
-
-            $role_name = "FirehoseServiceRole-$this->instance_name-$this->region-$firehose_name";
-
-            if(strlen($role_name) > 64)
-            {
-                $role_name = substr($role_name,0,63);
-            }
-
-            print $role_name.PHP_EOL; 
-
-            //sleep(10);
-            
-
-            $assumeroledoc = <<<END
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": "firehose.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
-            }
-        ]
-    }
-    END;
-
-            /* Removed for Testing*/
-            $result = $IamClient->createRole([
-                'AssumeRolePolicyDocument' => $assumeroledoc, // REQUIRED
-                'Description' => 'Allows Kinesis Firehose to transform and deliver data to your destinations using CloudWatch Logs, Lambda, and S3 on your behalf.',
-                //'MaxSessionDuration' => <integer>,
-                'Path' => "/service-role/",
-                //'PermissionsBoundary' => '<string>',
-                'RoleName' => $role_name, // REQUIRED
-                'Tags' => [
-                    [
-                        'Key' => 'connect', // REQUIRED
-                        'Value' => $this->instance_name, // REQUIRED
-                    ],
-                    // ...
-                ],
-            ]);
-
-            print_r($result);
-
-            
-            
-
-            
-            sleep(10);
-
-            print "Attaching Policy $arn to Role $role_name.".PHP_EOL;
-
-            /* Removed for Testing*/
-            $result = $IamClient->attachRolePolicy([
-                'PolicyArn' => $arn, // REQUIRED
-                'RoleName' => $role_name, // REQUIRED
-            ]);
-
-            print_r($result);
-            
-
-            sleep(10);
-
-            $result = $IamClient->getRole([
-                'RoleName' => $role_name, // REQUIRED
-            ]);
-
-            print_r($result);
-
-            $role_arn = $result['Role']['Arn'];
-            
-            sleep(10);
-
-            
-            $policies = $IamClient->ListAttachedRolePolicies([
-                'RoleName' => $role_name, // REQUIRED
-            ]);
-
-            print_r($policies);
-
-            foreach($policies['AttachedPolicies'] as $policy){
-                print_r($policy);
-                $versions = $IamClient->listPolicyVersions(['PolicyArn' => $policy['PolicyArn']]); // Gets policy versions
-
-                $p = $IamClient->getPolicyVersion(['PolicyArn' => $policy['PolicyArn'],'VersionId'=>"v1"]); // Gets policy version 
-
-                $json = urldecode($p['PolicyVersion']['Document']); // Decode the urlencoded string into json.
-
-                //$p = $IamClient->listEntitiesForPolicy(['PolicyArn' => $policy['PolicyArn']]); // Gets list of attached groups,users,roles for policy
-                //$p = $IamClient->listPoliciesGrantingServiceAccess(['PolicyName' => $policy['PolicyName'],'RoleName' => $rolename]); // Gets policy versions
-                print_r($json);
-            }
-
-        
-            echo "###################################################".PHP_EOL;
-            echo "            Deploy Connect Firehose                ".PHP_EOL;
-            echo "###################################################".PHP_EOL;   
-
-
             $FirehoseClient = $this->FirehoseClient($this->region);
 
+            
             $fhs = $FirehoseClient->listDeliveryStreams();
 
-            print_r($fhs);
+            // if the fireshose already exists no need to create all of this so skip it. 
+            if(!in_array($firehose_name, $fhs['DeliveryStreamNames'])){
+                $firehoseperms = [  $IAM->allowDatabase(),
+                                    $IAM->allowS3($bucket),
+                                    $IAM->allowLambda(),
+                                    $IAM->allowLogs($firehose_name),
+                                    $IAM->allowDecryptS3(),
+                                    $IAM->allowKinesisStreams([$streamarn]),
+                                    $IAM->allowDecryptKinesis(),
+                ];
 
-            foreach($fhs['DeliveryStreamNames'] as $fh)
-            {
-                $firehose = $FirehoseClient->describeDeliveryStream(['DeliveryStreamName' => $fh]);
 
-                print_r($firehose);
+                $json = json_encode($firehoseperms,JSON_UNESCAPED_SLASHES);
+
+                $jsonperms = <<<END
+{
+    "Version":"2012-10-17",
+    "Statement":$json
+}
+END;
+                print_r($jsonperms);
+
+                $IamClient = $this->IamClient($this->region);
+
+                //$roles = $IamClient->listRoles();
+                //print_r($roles);
+                
+
+                sleep(10);
+
+                print "Creating Policy.".PHP_EOL;
+
+                $policy_name = "KinesisFirehoseServicePolicy-$this->instance_name-$this->region-$firehose_name";
+                
+                /* Removed for Testing*/
+                $policy = $IamClient->createPolicy([
+                    //'Description' => '<string>',
+                    //'Path' => '<string>',
+                    'PolicyDocument' => $jsonperms, // REQUIRED
+                    'PolicyName' => $policy_name, // REQUIRED
+                    'Tags' => [
+                        [
+                            'Key' => 'connect', // REQUIRED
+                            'Value' => $this->instance_name, // REQUIRED
+                        ],
+                        
+                    ],
+                ]);
+
+                print_r($policy);
+        
+                sleep(10);
+
+                $policies = $IamClient->listPolicies();
+                print_r($policies);
+
+                foreach($policies['Policies'] as $p)
+                {
+                    if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
+                    {
+                        $arn = $p['Arn'];
+                        print "Found Policy Arn: $arn".PHP_EOL;
+                        //print_r($arn);
+                        break;
+                    }
+                }
+
+                sleep(10);
+
+
+                echo "###################################################".PHP_EOL;
+                echo "            Deploy IAM Roles for Firehose          ".PHP_EOL;
+                echo "###################################################".PHP_EOL;
+
+                $role_name = "FirehoseServiceRole-$this->instance_name-$this->region-$firehose_name";
+
+                if(strlen($role_name) > 64)
+                {
+                    $role_name = substr($role_name,0,63);
+                }
+
+                print $role_name.PHP_EOL; 
+
+                sleep(10);
+                
+
+                $assumeroledoc = <<<END
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "firehose.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+END;
+
+                /* Removed for Testing*/
+                $result = $IamClient->createRole([
+                    'AssumeRolePolicyDocument' => $assumeroledoc, // REQUIRED
+                    'Description' => 'Allows Kinesis Firehose to transform and deliver data to your destinations using CloudWatch Logs, Lambda, and S3 on your behalf.',
+                    //'MaxSessionDuration' => <integer>,
+                    'Path' => "/service-role/",
+                    //'PermissionsBoundary' => '<string>',
+                    'RoleName' => $role_name, // REQUIRED
+                    'Tags' => [
+                        [
+                            'Key' => 'connect', // REQUIRED
+                            'Value' => $this->instance_name, // REQUIRED
+                        ],
+                        // ...
+                    ],
+                ]);
+
+                print_r($result);
+
+                
+                
+
+                
+                sleep(10);
+
+                print "Attaching Policy $arn to Role $role_name.".PHP_EOL;
+
+                /* Removed for Testing*/
+                $result = $IamClient->attachRolePolicy([
+                    'PolicyArn' => $arn, // REQUIRED
+                    'RoleName' => $role_name, // REQUIRED
+                ]);
+
+                print_r($result);
+                
+
+                sleep(10);
+
+                $result = $IamClient->getRole([
+                    'RoleName' => $role_name, // REQUIRED
+                ]);
+
+                print_r($result);
+
+                $role_arn = $result['Role']['Arn'];
+                
+                sleep(10);
+
+                
+                $policies = $IamClient->ListAttachedRolePolicies([
+                    'RoleName' => $role_name, // REQUIRED
+                ]);
+
+                //print_r($policies);
+
+                /*
+                Not needed. 
+                foreach($policies['AttachedPolicies'] as $policy){
+                    //print_r($policy);
+                    $versions = $IamClient->listPolicyVersions(['PolicyArn' => $policy['PolicyArn']]); // Gets policy versions
+
+                    $p = $IamClient->getPolicyVersion(['PolicyArn' => $policy['PolicyArn'],'VersionId'=>$versions['Versions'][0]['VersionId']]); // Gets policy version 
+
+                    $json = urldecode($p['PolicyVersion']['Document']); // Decode the urlencoded string into json.
+
+                    //print_r($json);
+                }
+
+                */
+
+                sleep(10);
+            
+                echo "###################################################".PHP_EOL;
+                echo "            Deploy Connect Firehose                ".PHP_EOL;
+                echo "###################################################".PHP_EOL;   
+
+
+                
+                $FirehoseClient = $this->FirehoseClient($this->region);
+
+                
+                $fhs = $FirehoseClient->listDeliveryStreams();
+
+                /*
+                print_r($fhs);
+
+                foreach($fhs['DeliveryStreamNames'] as $fh)
+                {
+                    $firehose = $FirehoseClient->describeDeliveryStream(['DeliveryStreamName' => $fh]);
+
+                    print_r($firehose);
+                }
+                */
+                
+
+                $firehose = new Firehose($this->account_number,$this->region);
+
+                $fh = $firehose->generateKinesisStreamToS3Firehose($this->instance_name, $streamarn, $firehose_name, $bucket, $role_arn, $type);
+
+                $newfh = $FirehoseClient->createDeliveryStream($fh);
+
+                print_r($newfh);
+            }else{
+                print "Firehose $firehose_name already exists. No need to create it.".PHP_EOL;
+                sleep(5);
             }
 
-            $firehose = new Firehose($this->account_number,$this->region);
-
-            $fh = $firehose->generateKinesisStreamToS3Firehose($this->instance_name, $streamarn, $firehose_name, $bucket, $role_arn, $type);
-
-            $newfh = $FirehoseClient->createDeliveryStream($fh);
-
-            print_r($newfh);
+            
 
             
 
@@ -398,26 +430,71 @@ class DeployInstance extends Command
                 $storage_type = "AGENT_EVENTS";
             }
 
-            echo "###################################################".PHP_EOL;
-            echo "        Attach Kinesis to Connect Instance         ".PHP_EOL;
-            echo "###################################################".PHP_EOL;  
+            // Check to see if anything is already associated. 
+            $storageconfigs = $this->ConnectClient->listInstanceStorageConfigs(['InstanceId' => $this->instance_id, 'ResourceType' => $storage_type]);
 
-            $storage = [
-                            'InstanceId' => $this->instance_id, // REQUIRED
-                            'ResourceType' => $storage_type, // REQUIRED
-                            'StorageConfig' => [ // REQUIRED
-                                'KinesisStreamConfig' => [
-                                    'StreamArn' => $streamarn, // REQUIRED
+            if(empty($storageconfigs['StorageConfigs'])){
+
+                
+                echo "###################################################".PHP_EOL;
+                echo "        Attach Kinesis to Connect Instance         ".PHP_EOL;
+                echo "###################################################".PHP_EOL;  
+
+                $storage = [
+                                'InstanceId' => $this->instance_id, // REQUIRED
+                                'ResourceType' => $storage_type, // REQUIRED
+                                'StorageConfig' => [ // REQUIRED
+                                    'KinesisStreamConfig' => [
+                                        'StreamArn' => $streamarn, // REQUIRED
+                                    ],
+                                    'StorageType' => 'KINESIS_STREAM', // REQUIRED
                                 ],
-                                'StorageType' => 'KINESIS_STREAM', // REQUIRED
-                            ],
-                        ];
-            
-            $result = $this->ConnectClient->associateInstanceStorageConfig($storage);
+                            ];
+                
+                $result = $this->ConnectClient->associateInstanceStorageConfig($storage);
 
-            print_r($result);
+                print_r($result);
+            }
         }
 
+        $KmsClient = new KmsClient([
+            'version'     => 'latest',
+            'region'      => $this->region,
+            'credentials' => [
+                'key'    => $this->app_key,
+                'secret' => $this->app_secret,
+            ],
+        ]);
+
+        $aliases = $KmsClient->listAliases();
+
+        print_r($aliases);
+        foreach($aliases['Aliases'] as $alias)
+        {
+            if($alias["AliasName"] == "alias/aws/connect"){
+                print_r($alias);
+
+                if(isset($alias["TargetKeyId"])){
+                    $keyid = $alias["TargetKeyId"];
+
+                    $keys = $KmsClient->listKeys();
+                    foreach($keys['Keys'] as $k){
+                        if($k['KeyId'] == $keyid){
+                            $key = $k['KeyArn'];
+                        }
+                    }
+                    break;
+                }
+            }else{
+                $key = null;
+            }
+        }
+
+        sleep(10); 
+
+        echo "###################################################".PHP_EOL;
+        echo "     Attach S3 Storage to Connect Instance         ".PHP_EOL;
+        echo "###################################################".PHP_EOL;  
 
         $storage_types = [  'CHAT_TRANSCRIPTS',
                             'CALL_RECORDINGS',
@@ -427,25 +504,49 @@ class DeployInstance extends Command
 
         foreach($storage_types as $storage_type){
 
-            $storage = [
-                'InstanceId' => $this->instance_id, // REQUIRED
-                'ResourceType' => $storage_type, // REQUIRED
-                'StorageConfig' => [ // REQUIRED
-                    'S3Config' => [
-                        'BucketName' => $bucket, // REQUIRED
-                        'BucketPrefix' => $storage_type, // REQUIRED
-                        /*'EncryptionConfig' => [
-                            'EncryptionType' => 'KMS', // REQUIRED
-                            'KeyId' => '<string>', // REQUIRED
-                        ],*/
+            // Check to see if anything is already associated. 
+            $storageconfigs = $this->ConnectClient->listInstanceStorageConfigs(['InstanceId' => $this->instance_id, 'ResourceType' => $storage_type]);
+
+            if(empty($storageconfigs['StorageConfigs'])){
+
+                $storage = [
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                    'ResourceType' => $storage_type, // REQUIRED
+                    'StorageConfig' => [ // REQUIRED
+                        'S3Config' => [
+                            'BucketName' => $bucket, // REQUIRED
+                            'BucketPrefix' => $storage_type, // REQUIRED
+                            /*'EncryptionConfig' => [
+                                'EncryptionType' => 'KMS', // REQUIRED
+                                'KeyId' => $key, // REQUIRED
+                            ],*/
+                        ],
+                        'StorageType' => 'S3', // REQUIRED
                     ],
-                    'StorageType' => 'S3', // REQUIRED
-                ],
-            ];
+                ];
 
-            $result = $this->ConnectClient->associateInstanceStorageConfig($storage);
+                print $key;
+                if($key){
+                    
+                    $encryption = [
+                        'EncryptionType' => 'KMS', // REQUIRED
+                        'KeyId' => $key, // REQUIRED
+                    ];
+                    print "Key $key Found... Appling key...".PHP_EOL;
+                    $storage['StorageConfig']['S3Config']['EncryptionConfig'] = $encryption; 
+                }else{
+                    print "No key found".PHP_EOL;
+                }
 
-            print_r($result);
+                sleep(10);
+
+                $result = $this->ConnectClient->associateInstanceStorageConfig($storage);
+
+                print_r($result);
+            }else{
+                print "Storage $storage_type is all ready assigned.".PHP_EOL;
+                print_r($storageconfigs);
+            }
         }
 
 
@@ -527,6 +628,19 @@ class DeployInstance extends Command
 
     public function create_instance($instance)
     {
+        $result = $this->ConnectClient->listInstances();
+        $instances = $result['InstanceSummaryList'];
+
+        foreach($instances as $i){
+            if($i['InstanceAlias'] == $this->instance_name){
+                print "Connect already exists with alias $this->instance_name".PHP_EOL;
+                $instance_id = $i['Id'];
+                $instance = $this->ConnectClient->describeInstance(['InstanceId' => $instance_id]);
+                //die();
+                return $instance; 
+            } 
+        }
+
         //print_r($instance);
         try{
             $result = $this->ConnectClient->createInstance($instance);
