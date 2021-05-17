@@ -20,6 +20,7 @@ class Kernel extends ConsoleKernel
         // AWS 
         Commands\ListInstance::class,
         Commands\DeployInstance::class,
+        Commands\KinesisSubscribe::class,
     ];
 
     /**
