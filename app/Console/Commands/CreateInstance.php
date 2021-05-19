@@ -4,8 +4,9 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 
-use App\Models\Instance;
+use App\Models\AmazonConnect\Instance;
 use App\Models\Company;
+use App\Models\Account;
 
 class CreateInstance extends Command
 {
@@ -58,13 +59,39 @@ class CreateInstance extends Command
             $this->prompt(); 
         }
 
- 
-        $a = Instance::create(['account' => $this->account, 'name' => $this->instance_name]);
+        $builddoc = [
+            'storage' => [
+                'kinesis' => $this->kinesis,
+                's3' => $this->s3
+            ],
+            'region' => $this->region,
+            'saml'  => $this->saml
+        ];
+
+        $builddoc = json_encode($builddoc);
+
+        $name = Instance::where('name', $this->instance_name)
+                        ->where('account_id', $this->account_number)
+                        ->count();
+
+        if($name){
+            $instance = Instance::where('name', $this->instance_name)
+                            ->where('account_id', $this->account_number)
+                            ->first();
+
+            $instance->build_data = $builddoc;
+            $instance->save();
+        }else{
+            $instance = Instance::create(['name' => $this->instance_name, 'account_id' => $this->account_number, 'build_data' => $builddoc]);
+        }
+
+        print_r($instance);
+
+        return; 
     }
 	
     public function prompt()
     {
-
         if(!$this->company_id){
             $names = Company::names();
 
@@ -98,13 +125,33 @@ class CreateInstance extends Command
         ];
         $this->region = $this->choice('What region would you like to use?', $regions);
 
-        $storage = [
-            "none",
-            "s3",
+        $bolean = [
+            "no",
+            "yes",
         ];
 
-        $this->storage_type = $this->choice('Where do you want to store long term CTR and Agent Data?', $storage);
+        $kinesis = $this->choice('Would you like to setup a Kinesis Stream for CTR and Agent Events?', $bolean);
 
+        if($kinesis == "no"){
+            $this->kinesis = false;
+        }else{
+            $this->kinesis = true;
+        }
 
+        $s3 = $this->choice('Would you like to send the CTR and Agent Events to the S3 Bucket?', $bolean);
+
+        if($s3 == "no"){
+            $this->s3 = false;
+        }else{
+            $this->s3 = true;
+        }
+
+        $saml = $this->choice('Would you like to setup SAML Authentication?', $bolean);
+
+        if($s3 == "no"){
+            $this->saml = false;
+        }else{
+            $this->saml = true;
+        }
     }
 }

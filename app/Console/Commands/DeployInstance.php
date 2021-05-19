@@ -64,6 +64,9 @@ class DeployInstance extends Command
         $this->starttime = Carbon::now();
         echo $this->starttime.PHP_EOL;
 
+        // Application Code
+        $this->application = "awc";
+
         $instance = $this->get_instance_info();
 
 
@@ -78,8 +81,20 @@ class DeployInstance extends Command
             ],
         ]);
 
-
-
+        $this->tags = [
+            [
+                'Key' => 'ConnectInstance', // REQUIRED
+                'Value' => $this->instance_name,
+            ],
+            [
+                'Key' => 'Application', // REQUIRED
+                'Value' => strtoupper($this->application),
+            ],
+            [
+                'Key' => 'CostRecovery', // REQUIRED
+                'Value' => $this->costcode,
+            ],
+        ];
         
         /*Removed for testing*/
         try{
@@ -87,6 +102,7 @@ class DeployInstance extends Command
 
             print_r($new_instance);
             $this->instance_id = $new_instance['Instance']['Id']; 
+            $this->instance_arn = $new_instance['Instance']['Arn']; 
         }catch(Exception $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -111,7 +127,7 @@ class DeployInstance extends Command
         
         $S3Client = $this->S3Client($this->region); 
 
-        $bucket = "s3-amazonconnect-{$this->instance_name}";
+        $bucket = "s3-$this->environment-$this->shortregion-$this->application-$this->instance_name";
 
         $bucketlist = $S3->listBucketsAndRegions();
         if(key_exists($bucket, $bucketlist)){
@@ -123,6 +139,13 @@ class DeployInstance extends Command
             print_r($newbucket); 
 
             sleep(10);
+
+            $S3Client->putBucketTagging(
+                ['Bucket' => $bucket,
+                'Tagging' => [ // REQUIRED
+                    'TagSet' => $this->tags
+                ],
+            ]);
 
             $bucketlist = $S3->listBucketsAndRegions();
 
@@ -138,7 +161,7 @@ class DeployInstance extends Command
         
         $recordtypes = [
             "ctr",
-            "agent-events",
+            "agentevents",
         ];
 
         // Loop thru the record types and create stream, policy, role, and firehouse and attach them to connect instance. 
@@ -161,7 +184,7 @@ class DeployInstance extends Command
 
             print_r($streams);
 
-            $stream_name = "ks-$this->instance_name-$type";
+            $stream_name = "kin-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
 
             if(!in_array($stream_name, $streams['StreamNames'])){
                 $stream = [
@@ -198,14 +221,53 @@ class DeployInstance extends Command
                     $streamname = $result['StreamDescriptionSummary']['StreamName'];
                     $streamarn = $result['StreamDescriptionSummary']['StreamARN'];
             }
-        
+
+
+            echo "###################################################".PHP_EOL;
+            echo "            Check Tags on Kinesis Stream           ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
+
             
+            $kinesistags = [
+                    'ConnectInstance' => $this->instance_name,
+                    'Application' => strtoupper($this->application),
+                    'CostRecovery' => $this->costcode,
+                ];
+        
+
+            $result = $KinesisClient->listTagsForStream([
+                //'ExclusiveStartTagKey' => '<string>',
+                //'Limit' => <integer>,
+                'StreamName' => $stream_name, // REQUIRED
+            ]);
+
+            print_r($result);
+
+
+            echo "###################################################".PHP_EOL;
+            echo "            Apply Tags to Kinesis Stream           ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
+            $result = $KinesisClient->addTagsToStream([
+                'StreamName' => $stream_name, // REQUIRED
+                'Tags' => $kinesistags, // REQUIRED
+            ]);
+
+
+            $result = $KinesisClient->listTagsForStream([
+                //'ExclusiveStartTagKey' => '<string>',
+                //'Limit' => <integer>,
+                'StreamName' => $stream_name, // REQUIRED
+            ]);
+
+            print_r($result);
+        
+
             echo "###################################################".PHP_EOL;
             echo "            Deploy IAM Policy for Firehose         ".PHP_EOL;
             echo "###################################################".PHP_EOL;
 
 
-            $firehose_name = "fh-$this->instance_name-$type";
+            $firehose_name = "fhds-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
 
             $FirehoseClient = $this->FirehoseClient($this->region);
 
@@ -244,40 +306,60 @@ END;
 
                 print "Creating Policy.".PHP_EOL;
 
-                $policy_name = "KinesisFirehoseServicePolicy-$this->instance_name-$this->region-$firehose_name";
                 
-                /* Removed for Testing*/
-                $policy = $IamClient->createPolicy([
-                    //'Description' => '<string>',
-                    //'Path' => '<string>',
-                    'PolicyDocument' => $jsonperms, // REQUIRED
-                    'PolicyName' => $policy_name, // REQUIRED
-                    'Tags' => [
-                        [
-                            'Key' => 'connect', // REQUIRED
-                            'Value' => $this->instance_name, // REQUIRED
-                        ],
-                        
-                    ],
-                ]);
 
-                print_r($policy);
-        
-                sleep(10);
+                $policy_name = "iampolicy-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
 
                 $policies = $IamClient->listPolicies();
                 print_r($policies);
-
+                
+                $policyfound = false;
                 foreach($policies['Policies'] as $p)
                 {
                     if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
                     {
+                        $policyfound = true;
                         $arn = $p['Arn'];
-                        print "Found Policy Arn: $arn".PHP_EOL;
+                        print "Found Policy already exists..".PHP_EOL;
                         //print_r($arn);
                         break;
+
                     }
                 }
+                
+                if(!$policyfound)
+                {
+                    /* Removed for Testing*/
+                    $policy = $IamClient->createPolicy([
+                        //'Description' => '<string>',
+                        //'Path' => '<string>',
+                        'PolicyDocument' => $jsonperms, // REQUIRED
+                        'PolicyName' => $policy_name, // REQUIRED
+                        'Tags' => $this->tags,
+                    ]);
+
+                    print_r($policy);
+            
+                    sleep(10);
+
+                    $policies = $IamClient->listPolicies();
+                    print_r($policies);
+
+                    foreach($policies['Policies'] as $p)
+                    {
+                        if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
+                        {
+                            $arn = $p['Arn'];
+                            print "Found Policy Arn: $arn".PHP_EOL;
+                            //print_r($arn);
+                            break;
+                        }
+                    }
+
+                }else{
+                    print "Policy already exists with name $policy_name".PHP_EOL;
+                }
+                
 
                 sleep(10);
 
@@ -286,7 +368,7 @@ END;
                 echo "            Deploy IAM Roles for Firehose          ".PHP_EOL;
                 echo "###################################################".PHP_EOL;
 
-                $role_name = "FirehoseServiceRole-$this->instance_name-$this->region-$firehose_name";
+                $role_name = "iamrole-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
 
                 if(strlen($role_name) > 64)
                 {
@@ -295,10 +377,22 @@ END;
 
                 print $role_name.PHP_EOL; 
 
-                sleep(10);
+                $roles = $IamClient->listRoles();
+                print_r($roles);
+                $rolefound = false;
+                foreach($roles['Roles'] as $role){
+                    if($role['RoleName'] == $role_name)
+                    {
+                        print "Role alredy exists with name $role_name".PHP_EOL;
+                        $rolefound = true;
+                        break;
+                    }
+                }
+
+                if(!$rolefound){
                 
 
-                $assumeroledoc = <<<END
+                    $assumeroledoc = <<<END
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -313,41 +407,39 @@ END;
 }
 END;
 
-                /* Removed for Testing*/
-                $result = $IamClient->createRole([
-                    'AssumeRolePolicyDocument' => $assumeroledoc, // REQUIRED
-                    'Description' => 'Allows Kinesis Firehose to transform and deliver data to your destinations using CloudWatch Logs, Lambda, and S3 on your behalf.',
-                    //'MaxSessionDuration' => <integer>,
-                    'Path' => "/service-role/",
-                    //'PermissionsBoundary' => '<string>',
-                    'RoleName' => $role_name, // REQUIRED
-                    'Tags' => [
-                        [
-                            'Key' => 'connect', // REQUIRED
-                            'Value' => $this->instance_name, // REQUIRED
-                        ],
-                        // ...
-                    ],
-                ]);
 
-                print_r($result);
+                    sleep(10);
 
-                
-                
+                    /* Removed for Testing*/
+                    $result = $IamClient->createRole([
+                        'AssumeRolePolicyDocument' => $assumeroledoc, // REQUIRED
+                        'Description' => 'Allows Kinesis Firehose to transform and deliver data to your destinations using CloudWatch Logs, Lambda, and S3 on your behalf.',
+                        //'MaxSessionDuration' => <integer>,
+                        'Path' => "/service-role/",
+                        //'PermissionsBoundary' => '<string>',
+                        'RoleName' => $role_name, // REQUIRED
+                        'Tags' => $this->tags,
+                    ]);
 
-                
-                sleep(10);
+                    print_r($result);
 
-                print "Attaching Policy $arn to Role $role_name.".PHP_EOL;
+                    sleep(10);
 
-                /* Removed for Testing*/
-                $result = $IamClient->attachRolePolicy([
-                    'PolicyArn' => $arn, // REQUIRED
-                    'RoleName' => $role_name, // REQUIRED
-                ]);
+                    $policies = $IamClient->ListAttachedRolePolicies([
+                        'RoleName' => $role_name, // REQUIRED
+                    ]);
 
-                print_r($result);
-                
+                    print "Attaching Policy $arn to Role $role_name.".PHP_EOL;
+
+                    /* Removed for Testing*/
+                    $result = $IamClient->attachRolePolicy([
+                        'PolicyArn' => $arn, // REQUIRED
+                        'RoleName' => $role_name, // REQUIRED
+                    ]);
+
+                    print_r($result);
+                }
+
 
                 sleep(10);
 
@@ -366,6 +458,24 @@ END;
                     'RoleName' => $role_name, // REQUIRED
                 ]);
 
+                $policyfound = false;
+                foreach($policies['AttachedPolicies'] as $policy){
+                    print_r($policy);
+                    if($policy['PolicyArn'] == $arn){
+                        $policyfound = true;
+                        print "Found Policy ARN $arn attached to $role_name".PHP_EOL;
+                    }
+                }
+
+                if(!$policyfound){
+                    /* Removed for Testing*/
+                    $result = $IamClient->attachRolePolicy([
+                        'PolicyArn' => $arn, // REQUIRED
+                        'RoleName' => $role_name, // REQUIRED
+                    ]);
+
+                    print_r($result);
+                }
                 //print_r($policies);
 
                 /*
@@ -410,7 +520,7 @@ END;
 
                 $firehose = new Firehose($this->account_number,$this->region);
 
-                $fh = $firehose->generateKinesisStreamToS3Firehose($this->instance_name, $streamarn, $firehose_name, $bucket, $role_arn, $type);
+                $fh = $firehose->generateKinesisStreamToS3Firehose($streamarn, $firehose_name, $bucket, $role_arn, $type, $this->tags);
 
                 $newfh = $FirehoseClient->createDeliveryStream($fh);
 
@@ -426,7 +536,7 @@ END;
 
             if($type == "ctr"){
                 $storage_type = "CONTACT_TRACE_RECORDS";
-            }if($type == "agent-events"){
+            }if($type == "agentevents"){
                 $storage_type = "AGENT_EVENTS";
             }
 
@@ -515,7 +625,7 @@ END;
                     'StorageConfig' => [ // REQUIRED
                         'S3Config' => [
                             'BucketName' => $bucket, // REQUIRED
-                            'BucketPrefix' => $storage_type, // REQUIRED
+                            'BucketPrefix' => $storage_type."-", // REQUIRED
                             /*'EncryptionConfig' => [
                                 'EncryptionType' => 'KMS', // REQUIRED
                                 'KeyId' => $key, // REQUIRED
@@ -548,6 +658,28 @@ END;
                 print_r($storageconfigs);
             }
         }
+
+        
+        /*
+        echo "###################################################".PHP_EOL;
+        echo "          Apply Tags to Connect Instance           ".PHP_EOL;
+        echo "###################################################".PHP_EOL;  
+
+        $tags = $this->ConnectClient->listTagsForResource([
+            'resourceArn' => $this->instance_arn, // REQUIRED
+        ]);
+
+
+        foreach($tags as $tag){
+
+        }
+
+        $result = $this->ConnectClient->tagResource([
+            'resourceArn' => $this->instance_arn, // REQUIRED
+            'tags' => $this->tags, // REQUIRED
+        ]);
+        */
+
 
 
         $time = Carbon::now();
@@ -632,8 +764,8 @@ END;
         $instances = $result['InstanceSummaryList'];
 
         foreach($instances as $i){
-            if($i['InstanceAlias'] == $this->instance_name){
-                print "Connect already exists with alias $this->instance_name".PHP_EOL;
+            if($i['InstanceAlias'] == $this->instance_alias){
+                print "Connect already exists with alias $this->instance_alias".PHP_EOL;
                 $instance_id = $i['Id'];
                 $instance = $this->ConnectClient->describeInstance(['InstanceId' => $instance_id]);
                 //die();
@@ -660,7 +792,7 @@ END;
         $time = Carbon::now();
         $timeout = Carbon::now()->addMinutes(20);
 
-        echo $time . " Creating Instance ID: {$instance_id} with name: {$this->instance_name}".PHP_EOL;
+        echo $time . " Creating Instance ID: {$instance_id} with name: {$this->instance_alias}".PHP_EOL;
         
         while($creating == true && $time <= $timeout){
             $result = $this->ConnectClient->listInstances();
@@ -729,15 +861,28 @@ END;
         ]; 
         
         $this->region = $this->choice('What Region would you like to use?', $regions);
+
+        $this->shortregion = str_replace("-","",$this->region);
         
-        $this->instance_name = strtolower($this->ask('What is the name of the instance?'));
+        $this->instance_name = strtolower($this->ask('What is the name of the instance?', "kss"));
+
+        $this->costcode = strtoupper($this->ask('What is the CostCode?', "KTGT"));
 
         //$this->instance_name = strtolower($this->instance_name);
+
+        $environments = [
+            "lab",
+            "prod"
+        ];
+
+        $this->environment = $this->choice('What environment would you like to deploy this in?', $environments);
+
+        $this->instance_alias = "connect-$this->environment-$this->shortregion-$this->application-$this->instance_name";
 
         $instance_array = [
             "IdentityManagementType" => "SAML",
             "InboundCallsEnabled" => true,
-            "InstanceAlias" => $this->instance_name,
+            "InstanceAlias" => $this->instance_alias,
             "OutboundCallsEnabled" => true
         ];
         

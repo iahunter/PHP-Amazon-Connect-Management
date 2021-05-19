@@ -12,21 +12,21 @@ use Carbon\Carbon;
 use App\Models\Company;
 use App\Models\Account;
 
-class KinesisSubscribe extends Command
+class KinesisSubscribeAll extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'aws:kinesis-subscribe-stream {company?} {account_number?}';
+    protected $signature = 'aws:kinesis-subscribe-streams {company?} {account_number?}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Subscribes to Stream and Prints to the Console';
+    protected $description = 'Subscribes to all Streams and Prints to the Console';
 
     /**
      * Create a new command instance.
@@ -50,23 +50,22 @@ class KinesisSubscribe extends Command
 
         $KinesisClient = $this->KinesisClient($this->region);
 
-
         $streamlist = $KinesisClient->listStreams();
         //print_r($streamlist);
         $streams = $streamlist['StreamNames'];
-        
-        $streamname = $this->choice('What Stream would you like to subscribe to?', $streams, $maxAttempts = 3, $allowMultipleSelections = true);
 
         $streamarray = [];
 
-        $shards = $KinesisClient->listShards([
-            /*'ExclusiveStartShardId' => '<string>',
-            'MaxResults' => <integer>,
-            'NextToken' => '<string>',
-            'StreamCreationTimestamp' => <integer || string || DateTime>,*/
-            'StreamName' => $streamname,
-        ]);
-        $streamarray[$streamname] = $shards;
+        foreach($streams as $streamname){
+            $shards = $KinesisClient->listShards([
+                /*'ExclusiveStartShardId' => '<string>',
+                'MaxResults' => <integer>,
+                'NextToken' => '<string>',
+                'StreamCreationTimestamp' => <integer || string || DateTime>,*/
+                'StreamName' => $streamname,
+            ]);
+            $streamarray[$streamname] = $shards;
+        }
 
         $streamsharditerators = [];
 
@@ -92,10 +91,10 @@ class KinesisSubscribe extends Command
         }
 
         //print_r($streamsharditerators);
-        print "Monitoring Stream $streamname".PHP_EOL;
+
         while(true){
             foreach($streamsharditerators as $streamname => $shards){
-                //print $streamname.PHP_EOL;
+                print $streamname.PHP_EOL;
                 foreach($shards as $shardid => $iterator){
                     $reply = $KinesisClient->getRecords([
                     'Limit' => 1000,
@@ -124,7 +123,7 @@ class KinesisSubscribe extends Command
                 }
             }
 
-            //print "No new records found... Please Wait...".PHP_EOL;
+            print "No new records found... Please Wait...".PHP_EOL;
 
             sleep(2);
         }

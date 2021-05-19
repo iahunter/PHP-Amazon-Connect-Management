@@ -42,5 +42,7 @@ class DeleteInstance extends Command
         $id = $this->argument('id');
 
         $instance = Instance::destroy($id);
+
+        print_r($instance);
     }
 }

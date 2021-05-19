@@ -9,7 +9,7 @@ class Firehose
         $this->region = $region;
     }
     
-    public function generateKinesisStreamToS3Firehose($instance_name, $stream_arn, $firehose_name, $bucket, $role_arn, $type)
+    public function generateKinesisStreamToS3Firehose($stream_arn, $firehose_name, $bucket, $role_arn, $type, $tags = [])
     {
         return [    
                     "DeliveryStreamName" => $firehose_name,
@@ -40,12 +40,8 @@ class Firehose
                         ],
                     ],
 
-                    'Tags' => [
-                        [
-                            'Key' => 'connect', // REQUIRED
-                            'Value' => $instance_name,
-                        ],
-                    ],
+                    'Tags' => $tags,
+                        
                 ];
 
     }
