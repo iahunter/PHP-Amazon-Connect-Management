@@ -22,8 +22,8 @@ class Firehose
                     "S3DestinationConfiguration" => [
                         "RoleARN" => $role_arn,
                         "BucketARN" => "arn:aws:s3:::$bucket",
-                        "Prefix" => $type,
-                        "ErrorOutputPrefix" => $type."Errors",
+                        "Prefix" => $type."-",
+                        "ErrorOutputPrefix" => $type."-errors-",
                         "BufferingHints" => [
                                 "SizeInMBs" => 5,
                                 "IntervalInSeconds" => 300

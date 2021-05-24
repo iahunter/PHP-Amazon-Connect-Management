@@ -137,4 +137,28 @@ class IAM
             ],
         ];
     }    
+
+    public function getConnectFederationPolicy($instance_arn)
+    {
+        return [
+            "Sid" => "",
+            "Effect" => "Allow",
+            "Action" => ["connect:GetFederationToken"
+            ],
+            "Resource" => [$instance_arn.'/user/${aws:userid}',
+            ],
+        ];
+    }    
+
+    public function getAzureAdAccessPolicy()
+    {
+        return [
+            "Sid" => "",
+            "Effect" => "Allow",
+            "Action" => ["iam:ListRoles","iam:ListAccountAliases"
+            ],
+            "Resource" => ["*",
+            ],
+        ];
+    }    
 }

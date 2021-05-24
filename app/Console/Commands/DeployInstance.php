@@ -84,7 +84,7 @@ class DeployInstance extends Command
         $this->tags = [
             [
                 'Key' => 'ConnectInstance', // REQUIRED
-                'Value' => $this->instance_name,
+                'Value' => $this->instance_alias,
             ],
             [
                 'Key' => 'Application', // REQUIRED
@@ -102,7 +102,7 @@ class DeployInstance extends Command
 
             print_r($new_instance);
             $this->instance_id = $new_instance['Instance']['Id']; 
-            $this->instance_arn = $new_instance['Instance']['Arn']; 
+            $this->instance_arn = $new_instance['Instance']['Arn'];
         }catch(Exception $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -229,7 +229,7 @@ class DeployInstance extends Command
 
             
             $kinesistags = [
-                    'ConnectInstance' => $this->instance_name,
+                    'ConnectInstance' => $this->instance_alias,
                     'Application' => strtoupper($this->application),
                     'CostRecovery' => $this->costcode,
                 ];

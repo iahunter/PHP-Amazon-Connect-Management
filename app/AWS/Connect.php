@@ -18,7 +18,5 @@ class Connect
                 'secret' => $this->app_secret,
             ],
         ]);
-
     }
-
 }
