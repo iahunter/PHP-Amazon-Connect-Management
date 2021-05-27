@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 
-
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Crypt;
 use Carbon\Carbon;
 
@@ -154,7 +154,8 @@ class DeployConnectSamlAuth extends Command
         $this->shortregion = str_replace("-","",$this->region);
 
 
-        
+        $this->instance_id = $this->instance['Id']; 
+
         echo "###################################################".PHP_EOL;
         echo "                      Deploy SAML                  ".PHP_EOL;
         echo "###################################################".PHP_EOL;
@@ -188,6 +189,8 @@ class DeployConnectSamlAuth extends Command
 
         print_r($this->instance);
 
+
+
         $IAM = new IAM($this->account_number, $this->region);
 
         $IamClient = new IamClient([
@@ -199,7 +202,7 @@ class DeployConnectSamlAuth extends Command
             ],
         ]);
 
-
+        
         echo "###################################################".PHP_EOL;
         echo "       Creating Azure Federation Policy            ".PHP_EOL;
         echo "###################################################".PHP_EOL;
@@ -358,60 +361,28 @@ END;
             print "Policy already exists with name $policy_name".PHP_EOL;
         }
 
-        echo "###################################################".PHP_EOL;
-        echo "             Creating Azure CLI User               ".PHP_EOL;
-        echo "###################################################".PHP_EOL;
+        $appKeys = [];
 
-        $username = "iamuser-$this->environment-$this->shortregion-$this->application-$this->instance_name-azure-cli";
+        $types = ['admins', 'agents'];
+        //$types = ['agents'];
 
-        $users = $IamClient->listUsers();
+        foreach($types as $type){
 
-        print_r($users); 
+            echo "###################################################".PHP_EOL;
+            echo "             Creating Azure CLI User               ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
 
-        $foundCliUser = false;
-        
-        
-
-
-        if(isset($users['Users'])){
-            foreach($users['Users'] as $u)
-            {
-                if(isset($u['UserName']) && $username == $u['UserName'])
-                {
-                    $cliUserArn = $u['Arn'];
-                    print "Found User Arn: $cliUserArn".PHP_EOL;
-                    $foundCliUser = true;
-                    //print_r($arn);
-                    break;
-                }
-            }
-        }else{
-            print "Unexpected response from AWS... ";
-            return;
-        }
-
-        
-        
-        
-        
-        $cliUserAppKey = false;
-
-        if(!$foundCliUser){
-            $result = $IamClient->createUser([
-                'Path' => '/',
-                //'PermissionsBoundary' => '<string>',
-                'Tags' => $this->tags,
-                'UserName' => $username, // REQUIRED
-            ]);
-
-            print_r($result);
+            $username = "iamuser-$this->environment-$this->shortregion-$this->application-$this->instance_name-azure-cli-$type";
 
             $users = $IamClient->listUsers();
 
             print_r($users); 
 
             $foundCliUser = false;
-           
+            
+            
+
+
             if(isset($users['Users'])){
                 foreach($users['Users'] as $u)
                 {
@@ -419,28 +390,8 @@ END;
                     {
                         $cliUserArn = $u['Arn'];
                         print "Found User Arn: $cliUserArn".PHP_EOL;
+                        $foundCliUser = true;
                         //print_r($arn);
-    
-                        // Tag user
-                        $result = $IamClient->tagUser([
-                            'Tags' => $this->tags,
-                            'UserName' => $username, // REQUIRED
-                        ]);
-
-                        // Create access key and secret. Save as variable for later. 
-                        $cliUserAppKey = $IamClient->createAccessKey([
-                            'UserName' => $username, // REQUIRED
-                        ]);
-
-                        // Attach policy
-
-                        $result = $IamClient->attachUserPolicy([
-                            'PolicyArn' => $cliPolicyArn, // REQUIRED
-                            'UserName' => $username, // REQUIRED
-                        ]);
-            
-                        print_r($result);
-    
                         break;
                     }
                 }
@@ -448,88 +399,150 @@ END;
                 print "Unexpected response from AWS... ";
                 return;
             }
-        }
 
-        
-        
-
-        echo "###################################################".PHP_EOL;
-        echo "      Create the Azure CLI User in Azure AD        ".PHP_EOL;
-        echo "###################################################".PHP_EOL;
-
-        if($cliUserAppKey){
-            print_r($cliUserAppKey);
-        }else{
-
-            $keys = $IamClient->listAccessKeys([
-                'UserName' => $username,
-            ]);
-
-            print_r($keys);
             
-            $array = [];
-            foreach($keys['AccessKeyMetadata'] as $key){
-                $array[] = $key['AccessKeyId'];
-            }
+            
+            
+            
+            $cliUserAppKey = false;
 
-            $cliUserAppKey = $this->choice("Select App Key for user: $username", $array);
+            if(!$foundCliUser){
+                $result = $IamClient->createUser([
+                    'Path' => '/',
+                    //'PermissionsBoundary' => '<string>',
+                    'Tags' => $this->tags,
+                    'UserName' => $username, // REQUIRED
+                ]);
 
-            $cliUserAppKey = $this->secret("What is the App Secret for User: $username?");
-        }
+                print_r($result);
 
-    
+                file_put_contents(storage_path("/azurecreds/{$username}"), $result);
 
+                $users = $IamClient->listUsers();
 
-        print "Create the Azure AD AWS SAML application in Azure AD using the creds above!!!".PHP_EOL; 
+                print_r($users); 
 
-        /* ##############################################################################
-                Future??? Add section in Azure CLI that does this automatically??? 
-           ##############################################################################
-        */ 
+                $foundCliUser = false;
+            
+                if(isset($users['Users'])){
+                    foreach($users['Users'] as $u)
+                    {
+                        if(isset($u['UserName']) && $username == $u['UserName'])
+                        {
+                            $cliUserArn = $u['Arn'];
+                            print "Found User Arn: $cliUserArn".PHP_EOL;
+                            //print_r($arn);
+        
+                            // Tag user
+                            $result = $IamClient->tagUser([
+                                'Tags' => $this->tags,
+                                'UserName' => $username, // REQUIRED
+                            ]);
 
+                            // Create access key and secret. Save as variable for later. 
+                            $cliUserAppKey = $IamClient->createAccessKey([
+                                'UserName' => $username, // REQUIRED
+                            ]);
 
-        echo "###################################################".PHP_EOL;
-        echo "  Create the SAML Provider for Agents in Azure AD   ".PHP_EOL;
-        echo "###################################################".PHP_EOL;
+                            // Attach policy
 
-
-        $providerName = "iamsamlprovider-$this->environment-$this->shortregion-$this->application-$this->instance_name-agents";
-
-        $samlProviders = $IamClient->listSAMLProviders();
-
-        $foundAgentSamlProvider = false;
-
-        $regex = "/$providerName$/";
-
-        if(isset($samlProviders['SAMLProviderList'])){
-            foreach($samlProviders['SAMLProviderList'] as $u)
-            {
-                if(isset($u['Arn']) && preg_match($regex, $u['Arn']))
-                {
-                    $agentSamlProivderArn = $u['Arn'];
-                    print "Found Policy Arn: $agentSamlProivderArn".PHP_EOL;
-                    $foundAgentSamlProvider = true;
-                    //print_r($arn);
-                    break;
+                            $result = $IamClient->attachUserPolicy([
+                                'PolicyArn' => $cliPolicyArn, // REQUIRED
+                                'UserName' => $username, // REQUIRED
+                            ]);
+                
+                            print_r($result);
+        
+                            break;
+                        }
+                    }
+                }else{
+                    print "Unexpected response from AWS... ";
+                    return;
                 }
             }
-        }else{
-            print "Unexpected response from AWS... ";
-            return;
-        }
 
-        if(!$foundAgentSamlProvider){
-            $metadata = $this->ask('Paste in the SAML Metadata Document from Azure AD to Continue...');
+            
+            
 
-            $result = $IamClient->createSAMLProvider([
-                'Name' => $providerName, // REQUIRED
-                'SAMLMetadataDocument' => $metadata, // REQUIRED
-                'Tags' => $this->tags
-            ]);
+            echo "###################################################".PHP_EOL;
+            echo "      Create the Azure CLI User in Azure AD        ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
+
+            if($cliUserAppKey){
+                print_r($cliUserAppKey);
+            }else{
+
+                $keys = $IamClient->listAccessKeys([
+                    'UserName' => $username,
+                ]);
+
+                print_r($keys);
+                
+                $array = [];
+                foreach($keys['AccessKeyMetadata'] as $key){
+                    $array[] = $key['AccessKeyId'];
+                }
+
+                $cliUserAppKey = $this->choice("Select App Key for user: $username", $array);
+
+                $cliUserAppSecret = $this->secret("What is the App Secret for User: $username?");
+            }
+
+        
+            
+
+            print "Create the Azure AD AWS SAML application in Azure AD using the creds above!!!".PHP_EOL; 
+
+
+
+            echo "#########################################################".PHP_EOL;
+            echo "  Edit SAML Config for $type in Azure AD enterprise App  ".PHP_EOL;
+            echo "#########################################################".PHP_EOL;
+
+            if($type == 'admins'){
+
+                $relayState = "https://$this->region.console.aws.amazon.com/connect/federate/$this->instance_id?destination=%2Fconnect%2F";
+            }elseif($type == 'agents')
+            {
+                $relayState = "https://$this->region.console.aws.amazon.com/connect/federate/$this->instance_id?destination=%2Fconnect%2Fccp";
+
+            }else{
+                print "Unrecognized Type"; 
+                return;
+            }
+
+            echo "######################################################################".PHP_EOL;
+            echo "  Save this URL to enter into Azure AD Enterprise App SAML RelayState ".PHP_EOL;
+            echo "######################################################################".PHP_EOL;
+
+            print $relayState; 
+
+
+            sleep(10);
+
+
+            $array_update = ["samlSingleSignOnSettings" => [
+                "relayState" => $relayState,
+            ]];
+
+            $json = json_encode($array_update);
+
+            print $json; 
+            
+
+            
+
+            echo "###################################################".PHP_EOL;
+            echo "  Create the SAML Provider for $type in Azure AD   ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
+
+
+            $providerName = "iamsamlprovider-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
 
             $samlProviders = $IamClient->listSAMLProviders();
 
-            $foundAgentSamlProvider = false;
+            $foundSamlProvider = false;
 
             $regex = "/$providerName$/";
 
@@ -538,9 +551,9 @@ END;
                 {
                     if(isset($u['Arn']) && preg_match($regex, $u['Arn']))
                     {
-                        $agentSamlProivderArn = $u['Arn'];
-                        print "Found Saml Arn: $agentSamlProivderArn".PHP_EOL;
-                        $foundAgentSamlProvider = true;
+                        $samlProivderArn = $u['Arn'];
+                        print "Found Policy Arn: $samlProivderArn".PHP_EOL;
+                        $foundSamlProvider = true;
                         //print_r($arn);
                         break;
                     }
@@ -549,9 +562,169 @@ END;
                 print "Unexpected response from AWS... ";
                 return;
             }
-        }
 
+            if(!$foundSamlProvider){
+
+                
+                $path = storage_path('azure');
+                //$files = scandir($path);
+                $files = array_diff(scandir($path), array('.', '..'));
+                $files[] = "NotFound"; 
+
+                $metadata = $this->choice('Choose the generated Azure Metadocument File from Azure External Application SAML.', $files);
+
+                if($metadata == "NotFound"){
+                    $metadata = $this->ask('Paste in the SAML Metadata Document from Azure AD to Continue...');
+                }else{
+                    $metadata = file_get_contents(storage_path('azure').'/'.$metadata);
+                }
+
+                $result = $IamClient->createSAMLProvider([
+                    'Name' => $providerName, // REQUIRED
+                    'SAMLMetadataDocument' => $metadata, // REQUIRED
+                    'Tags' => $this->tags
+                ]);
+
+                $samlProviders = $IamClient->listSAMLProviders();
+
+                $foundSamlProvider = false;
+
+                $regex = "/$providerName$/";
+
+                if(isset($samlProviders['SAMLProviderList'])){
+                    foreach($samlProviders['SAMLProviderList'] as $u)
+                    {
+                        if(isset($u['Arn']) && preg_match($regex, $u['Arn']))
+                        {
+                            $samlProivderArn = $u['Arn'];
+                            print "Found Saml Arn: $samlProivderArn".PHP_EOL;
+                            $foundSamlProvider = true;
+                            //print_r($arn);
+                            break;
+                        }
+                    }
+                }else{
+                    print "Unexpected response from AWS... ";
+                    return;
+                }
+            }
+
+            echo "###################################################".PHP_EOL;
+            echo "            Deploy IAM Roles for Azure AD          ".PHP_EOL;
+            echo "###################################################".PHP_EOL;
+
+            $role_name = "iamrole-$this->environment-$this->shortregion-$this->application-$this->instance_name-$type";
+
+            if(strlen($role_name) > 64)
+            {
+                $role_name = substr($role_name,0,63);
+            }
+
+            print $role_name.PHP_EOL;
+
+            $roles = $IamClient->listRoles();
+            //print_r($roles);
+            $rolefound = false;
+            foreach($roles['Roles'] as $role){
+                if($role['RoleName'] == $role_name)
+                {
+                    print "Role alredy exists with name $role_name".PHP_EOL;
+                    $rolefound = true;
+                    break;
+                }
+            }
+
+            if(!$rolefound){
         
+            print "SAML Provider ARN: ".$samlProivderArn.PHP_EOL; 
+
+            $assumeroledoc = <<<END
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "$samlProivderArn"
+            },
+            "Action": "sts:AssumeRoleWithSAML",
+            "Condition": {
+                "StringEquals": {
+                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                }
+            }
+        }
+    ]
+}
+END;
+
+
+                print_r($assumeroledoc); 
+
+                sleep(10);
+
+                
+
+                /* Removed for Testing*/
+                $result = $IamClient->createRole([
+                    'AssumeRolePolicyDocument' => $assumeroledoc, // REQUIRED
+                    'Description' => "Allows Amazon Connect $type SAML Authentication" ,
+                    //'MaxSessionDuration' => <integer>,
+                    'Path' => "/",
+                    //'PermissionsBoundary' => '<string>',
+                    'RoleName' => $role_name, // REQUIRED
+
+                    'Tags' => $this->tags,
+                ]);
+
+                print_r($result);
+
+                sleep(10);
+
+            }
+
+
+            sleep(10);
+
+            $result = $IamClient->getRole([
+                'RoleName' => $role_name, // REQUIRED
+            ]);
+
+            print_r($result);
+
+            $role_arn = $result['Role']['Arn'];
+            
+            sleep(10);
+
+            
+            $policies = $IamClient->ListAttachedRolePolicies([
+                'RoleName' => $role_name, // REQUIRED
+            ]);
+
+            $attachedPolicyArns = [];
+            foreach($policies['AttachedPolicies'] as $policy){
+                $attachedPolicyArns[] = $policy['PolicyArn']; 
+            }
+
+            $attachPolicies = [
+                $cliPolicyArn,
+                $federationArn
+            ]; 
+
+            
+            $policyfound = false;
+            foreach($attachPolicies as $policy){
+                if(!in_array($policy, $attachedPolicyArns)){
+                    $result = $IamClient->attachRolePolicy([
+                        'PolicyArn' => $policy, // REQUIRED
+                        'RoleName' => $role_name, // REQUIRED
+                    ]);
+        
+                    print_r($result);
+                }
+            }
+
+        }
     }
 
     public function prompt()
