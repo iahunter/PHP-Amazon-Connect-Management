@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\AWS;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Crypt;
@@ -659,8 +659,40 @@ END;
             }
         }
 
+
+        echo "#####################################################################".PHP_EOL;
+        echo "      Enable Connect Instance Contact Flow Logs to Cloud Watch       ".PHP_EOL;
+        echo "#####################################################################".PHP_EOL;  
+
+        $attributeConfigs = $this->ConnectClient->listInstanceAttributes(['InstanceId' => $this->instance_id]);
+
+        print_r($attributeConfigs); 
+
+        if(!isset($attributeConfigs['Attributes'])){
+            print "Unexpected Result from AWS... Ending script...".PHP_EOL; 
+            return;
+        }else{
+            foreach($attributeConfigs['Attributes'] as $attribute){
+                print_r($attribute); 
+
+                if($attribute['Value'] != "true"){
+                    if($attribute['AttributeType'] != "USE_CUSTOM_TTS_VOICES"){
+                        $this->ConnectClient->updateInstanceAttribute(['InstanceId' => $this->instance_id,'AttributeType' => $attribute['AttributeType'],'Value' => "true"]);
+                    }
+                }else{
+                    if($attribute['AttributeType'] == "USE_CUSTOM_TTS_VOICES"){
+                        continue;
+                    }
+                }
+            }
+        }
+
+        $attributeConfigs = $this->ConnectClient->listInstanceAttributes(['InstanceId' => $this->instance_id]);
+
+        print_r($attributeConfigs); 
         
-        /*
+        /* Unbale to find where to tag instance.... 
+        
         echo "###################################################".PHP_EOL;
         echo "          Apply Tags to Connect Instance           ".PHP_EOL;
         echo "###################################################".PHP_EOL;  

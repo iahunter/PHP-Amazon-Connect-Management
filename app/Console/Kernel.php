@@ -13,15 +13,13 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        /**/
-        Commands\CreateInstance::class,
-        Commands\CreateCompany::class,
-        Commands\CreateAccount::class,
 
         // AWS 
-        Commands\ListInstance::class,
-        Commands\DeployInstance::class,
-        Commands\KinesisSubscribeAll::class,
+        /*
+        Commands\AWS\ListInstance::class,
+        Commands\AWS\DeployInstance::class,
+        Commands\AWS\KinesisSubscribeAll::class,
+        */
     ];
 
     /**

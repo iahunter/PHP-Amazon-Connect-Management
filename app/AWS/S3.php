@@ -30,36 +30,6 @@ class S3
             ],
         ]);
     }
-
-    //Returns an Array with Bucket name and Region
-    /* Example Use
-        $S3 = new S3(   
-                        $this->region,
-                        $this->app_key,
-                        $this->app_secret
-                    );
-                    
-        $bucketlist = $S3->listBucketsAndRegions();
-    */
-
-    /*
-        $newbuckets = [
-                        "arn:aws:s3:::{$this->instance}-ctr",
-                        "arn:aws:s3:::{$this->instance}-agent-events",
-                        "arn:aws:s3:::amazon/connect/{$this->instance}",       
-        ];
-
-        $bucketlist = $S3->listBucketsAndRegions();
-
-        print_r($bucketlist);
-
-
-        foreach($bucketlist as $bucketname => $region){
-            print $bucketname . $region.PHP_EOL;
-
-            $S3Client = $this->S3Client($region); 
-        }
-    */
     
     public function listBucketsAndRegions()
     {
