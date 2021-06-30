@@ -126,7 +126,7 @@ class BackupConnectInstances extends Command
                         Storage::makeDirectory("/backups/$this->company_name/$this->account_number", 0775, true); //creates directory
                     }
 
-                    print_r($instance);
+                    //print_r($instance);
                     $alias = $instance['InstanceAlias']; 
 
                     if(!Storage::exists("/backups/$this->company_name/$this->account_number/$alias")) {
@@ -162,17 +162,21 @@ class BackupConnectInstances extends Command
                     $backup['HoursOfOperations'] = $hours;
                     $backup['QuickConnects'] = $quickConnects;
 
+                    print_r($backup);
+
                     $json = json_encode($backup, JSON_PRETTY_PRINT); 
-                    print_r($json); 
+                    //print_r($json); 
+
+                    
 
                     $data = Instance::updateOrCreate(['name' => $instance['InstanceAlias'], 'instance_id' => $instance['Id'], 'account_id' => $this->account_number], ['region' => $region, 'json' => $json]);
 
-                    print_r($data);
+                    //print_r($data);
                     
                     $time = Carbon::now();
                     echo $time.PHP_EOL;
 
-                    print_r($time);
+                    //print_r($time);
         
                     //$time = explode(' ', $time);
 

@@ -82,8 +82,8 @@ query="CREATE DATABASE $DBNAME DEFAULT CHARACTER SET utf8 COLLATE utf8_general_c
 mysql -e "$query"
 
 # Create the DATABASE USER
-DBUSER="acm"
-DBPASS="acm"
+DBUSER="acm" # CHANGE ME!
+DBPASS="acm" # CHANGE ME!
 
 echo "Adding mysql user $DBUSER"
 query="CREATE USER '$DBUSER'@'%' IDENTIFIED BY '$DBPASS'";

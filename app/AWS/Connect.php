@@ -103,7 +103,7 @@ class Connect
                 if($found == true){
                     continue;
                 }else{
-                    print_r($flow);
+                    //print_r($flow);
                 }
 
                 // Need to possibly queue these jobs in case they error out. 
@@ -119,7 +119,7 @@ class Connect
                 }
                 
                 
-                print_r($getresult);
+                //print_r($getresult);
                 $custom_flows[] = $getresult['ContactFlow'];
             }
         }
@@ -219,6 +219,35 @@ class Connect
 
         if(isset($profiles['RoutingProfileSummaryList']) && count($profiles['RoutingProfileSummaryList'])){
             foreach($profiles['RoutingProfileSummaryList'] as $i){
+                // Need to possibly queue these jobs in case they error out. 
+                try{
+                    $getresult = $this->ConnectClient->describeRoutingProfile([
+                        'RoutingProfileId' => $i['Id'],
+                        'InstanceId' => $instance['Id'],
+                    ]);
+                }catch(AwsException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    continue;
+                }
+                
+                //print_r($getresult);
+                $list[] = $getresult['RoutingProfile'];
+            }
+        }
+
+        return $list;
+    }
+
+    public function backupSecurityProfiles($instance){
+        // Get Custom Flows and Store in the Database
+        $profiles = $this->ConnectClient->listRoutingProfiles([
+            'InstanceId' => $instance['Id'],
+        ]);
+
+        $list = [];
+
+        if(isset($profiles['SecurityProfileSummaryList']) && count($profiles['SecurityProfileSummaryList'])){
+            foreach($profiles['SecurityProfileSummaryList'] as $i){
                 // Need to possibly queue these jobs in case they error out. 
                 try{
                     $getresult = $this->ConnectClient->describeRoutingProfile([
