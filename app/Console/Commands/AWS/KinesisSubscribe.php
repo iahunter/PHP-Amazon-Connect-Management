@@ -115,7 +115,46 @@ class KinesisSubscribe extends Command
                     if(!empty($records)){
                         foreach($records as $record){
                             //print "Printing Record from Stream $streamname".PHP_EOL;
-                            print_r($record);
+                            //print_r($record);
+
+                            // Agent Events Filters. 
+                            $json = $record['Data']; 
+                            $array = json_decode($json); 
+                            //print_r($array); 
+
+                            if(isset($array->CurrentAgentSnapshot)){
+                                // If this is an agent event... parse it out and present usefull data. 
+                                $timestamp = $array->EventTimestamp; 
+                                $eventtype = $array->EventType; 
+
+                                if($eventtype != "STATE_CHANGE" &&  $eventtype != "LOGIN"){
+                                    continue;
+                                }
+
+                                $username = $array->CurrentAgentSnapshot->Configuration->Username; 
+
+                                $time = $array->CurrentAgentSnapshot->AgentStatus->StartTimestamp;
+                                $status = $array->CurrentAgentSnapshot->AgentStatus->Name;
+                                $contacts = $array->CurrentAgentSnapshot->Contacts;
+
+                                if(isset($array->PreviousAgentSnapshot)){
+                                    $oldtime = $array->PreviousAgentSnapshot->AgentStatus->StartTimestamp;
+                                    $oldstatus = $array->PreviousAgentSnapshot->AgentStatus->Name;
+                                }else{
+                                    $oldtime = null;
+                                    $oldstatus = null;
+                                }
+
+                                print_r($array); 
+                                
+                                
+                                print "$timestamp | $eventtype | $username | $oldtime | $oldstatus -> $status | $time"; 
+
+                                print_r($contacts); 
+                            }else{
+                                print_r($array);
+                            }
+                            
                         }
                     }else{
                         //print "found no records".PHP_EOL;

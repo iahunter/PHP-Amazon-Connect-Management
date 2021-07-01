@@ -5,6 +5,8 @@ namespace App\Models\AmazonConnect;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use Carbon\Carbon;
+
 class Ctr extends Model
 {
     use HasFactory;
@@ -126,5 +128,90 @@ class Ctr extends Model
 
         //echo 'Found nothing... Stopping... '.PHP_EOL;
     }
+
+    public static function format_record($array){
+
+                $insert['contact_id'] = $array['ContactId'];
+
+                $insert['instance_id'] = $array['InstanceARN']; 
+
+                $insert['s3_key'] = $array['S3_Key']; 
+
+				//print $insert['s3_key'].PHP_EOL;
+
+				$insert['account'] = $array['AWSAccountId'];
+				
+				$insert['channel'] = $array['Channel'];
+
+				$insert['initiation_method'] = $array['InitiationMethod'];
+				
+
+				if(isset($array['Queue']['Name'])){
+					$insert['queue'] = $array['Queue']['Name'];
+				}else{
+					$insert['queue'] = null;
+				}
+				
+				if(isset($array['Queue']['Duration'])){
+					$insert['queue_duration'] = $array['Queue']['Duration'];
+				}else{
+					$insert['queue_duration'] = null;
+				}
+
+				
+				if(isset($array['CustomerEndpoint']['Address'])){
+					$insert['customer_endpoint'] = $array['CustomerEndpoint']['Address']; 
+				}else{
+					$insert['customer_endpoint'] = null;
+				}
+				if(isset($array['SystemEndpoint']['Address'])){
+					$insert['system_endpoint'] = $array['SystemEndpoint']['Address'];
+				}else{
+					$insert['system_endpoint'] = null;
+				}
+				
+				if(isset($array['Agent']['Username'])){
+					$insert['agent'] = $array['Agent']['Username'];
+				}else{
+					$insert['agent'] = null;
+				}
+
+				if(isset($array['Agent']['ConnectedToAgentTimestamp'])){
+					//$insert['connect_to_agent_time'] = $array['Agent']['ConnectedToAgentTimestamp'];
+                    $insert['connect_to_agent_time'] = Carbon::parse($array['Agent']['ConnectedToAgentTimestamp']);
+                }else{
+					$insert['connect_to_agent_time'] = null;
+				}
+
+				if(isset($array['Agent']['AgentInteractionDuration'])){
+					$insert['connect_to_agent_duration'] = $array['Agent']['AgentInteractionDuration'];
+				}else{
+					$insert['connect_to_agent_duration'] = null;
+				}
+				
+				if(isset($array['InitiationTimestamp'])){
+					//$insert['start_time'] = $array['InitiationTimestamp'];
+                    $insert['start_time'] = Carbon::parse($array['InitiationTimestamp']);
+				}else{
+					$insert['start_time'] = null;
+				}
+				if(isset($array['DisconnectTimestamp'])){
+					//$insert['disconnect_time'] = $array['DisconnectTimestamp'];
+                    $insert['disconnect_time'] = Carbon::parse($array['DisconnectTimestamp']);
+				}else{
+					$insert['disconnect_time'] = null;
+				}
+
+				if(isset($array['DisconnectReason'])){
+					$insert['disconnect_reason'] = $array['DisconnectReason'];
+				}else{
+					$insert['disconnect_reason'] = null;
+				}
+
+				$insert['cdr_json'] = json_encode($array); 
+
+                return $insert;
+    }
+
 
 }

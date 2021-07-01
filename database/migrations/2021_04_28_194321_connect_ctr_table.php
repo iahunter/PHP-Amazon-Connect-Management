@@ -30,7 +30,7 @@ class ConnectCtrTable extends Migration
             $table->timestamp('start_time')->nullable()->index();
             $table->timestamp('disconnect_time')->nullable()->index();
             $table->integer('contact_duration')->nullable();
-            $table->integer('disconnect_reason')->nullable();
+            $table->string('disconnect_reason')->nullable();
 
             $table->json('cdr_json')->nullable();                       // JSON Custom Field Data
 		});

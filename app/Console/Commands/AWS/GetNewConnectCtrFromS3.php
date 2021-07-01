@@ -126,105 +126,54 @@ class GetNewConnectCtrFromS3 extends Command
 				// Download the body of the "key" object in the "bucket" bucket
 				$data = file_get_contents($key);
 				
+				print $key.PHP_EOL;
 				
+				if(json_decode($data, true)){
+					$array = json_decode($data, true);
+					$array['S3_Key'] = $key;
+					//print_r($array);
+					$insert = Ctr::format_record($array);
+					//print_r($insert);
+					//continue;
+					$result = DB::table('connect_ctrs')->insert($insert);
 
-				$array = json_decode($data, true);
+					//print_r($result);
+					//print " ".PHP_EOL;
+				}
+				else{
+					// If files has multiple records we need to parse them because they can't be decoded by json decoder
+					$array = [];
+					$fixstupidcrap = str_replace("}{", "}&&{", $data); 
+					$stupid = explode("&&", $fixstupidcrap);
+					//print_r($stupid);
+
+					foreach($stupid as $object){
+						$json = json_decode($object, true);
+						$json['S3_Key'] = $key;
+						//print_r($array);
+						$insert = Ctr::format_record($json);
+						//print_r($insert);
+						
+						$array[] = $insert;
+						//die();
+
+						print_r($array); 
+						//die();
+						//$result = Ctr::insert($insert);
+						$result = DB::table('connect_ctrs')->insert($insert);
+						//print_r($result);
+					}
+
+					//die();
+				}
 				
-				//print_r($array);
-				
+				//die();
 				if(!$array){
 					print " No contents in {$key}".PHP_EOL;
 					print_r($data).PHP_EOL;
 					continue; 
 				};
-
-				
-			
-				$insert['contact_id'] = $array['ContactId'];
-
-				$insert['s3_key'] = $key; 
-
-				print $insert['s3_key'].PHP_EOL;
-
-				$insert['account'] = $array['AWSAccountId'];
-				
-				$insert['channel'] = $array['Channel'];
-
-				$insert['initiation_method'] = $array['InitiationMethod'];
-				
-
-				if(isset($array['Queue']['Name'])){
-					$insert['queue'] = $array['Queue']['Name'];
-				}else{
-					$insert['queue'] = null;
-				}
-				
-				if(isset($array['Queue']['Duration'])){
-					$insert['queue_duration'] = $array['Queue']['Duration'];
-				}else{
-					$insert['queue_duration'] = null;
-				}
-
-				
-				if(isset($array['CustomerEndpoint']['Address'])){
-					$insert['customer_endpoint'] = $array['CustomerEndpoint']['Address']; 
-				}else{
-					$insert['customer_endpoint'] = null;
-				}
-				if(isset($array['SystemEndpoint']['Address'])){
-					$insert['system_endpoint'] = $array['SystemEndpoint']['Address'];
-				}else{
-					$insert['system_endpoint'] = null;
-				}
-				
-				if(isset($array['Agent']['Username'])){
-					$insert['agent'] = $array['Agent']['Username'];
-				}else{
-					$insert['agent'] = null;
-				}
-
-				if(isset($array['Agent']['ConnectedToAgentTimestamp'])){
-					$insert['connect_to_agent_time'] = $array['Agent']['ConnectedToAgentTimestamp'];
-				}else{
-					$insert['connect_to_agent_time'] = null;
-				}
-
-				if(isset($array['Agent']['AgentInteractionDuration'])){
-					$insert['connect_to_agent_duration'] = $array['Agent']['AgentInteractionDuration'];
-				}else{
-					$insert['connect_to_agent_duration'] = null;
-				}
-				
-				if(isset($array['InitiationTimestamp'])){
-					$insert['start_time'] = $array['InitiationTimestamp'];
-				}else{
-					$insert['start_time'] = null;
-				}
-				if(isset($array['DisconnectTimestamp'])){
-					$insert['disconnect_time'] = $array['DisconnectTimestamp'];
-				}else{
-					$insert['disconnect_time'] = null;
-				}
-
-				if(isset($array['DisconnectReason'])){
-					$insert['disconnect_reason'] = $array['DisconnectReason'];
-				}else{
-					$insert['disconnect_reason'] = null;
-				}
-
-				$insert['cdr_json'] = json_encode($array); 
-
-				
-				//print_r($insert); 
-
-				$inserts[] = $insert; 
-
-				DB::table('connect_ctrs')->insertOrIgnore($insert);
-				
 			}
 
-		//}
-	
-		
 	}
 }
