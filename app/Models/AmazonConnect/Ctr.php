@@ -15,9 +15,11 @@ class Ctr extends Model
     
     protected $primaryKey = 'contact_id';
 
+    public $timestamps = false;
+
     public $incrementing = false;
 	
-	protected $fillable = [ 
+	protected $fillable = [
         'contact_id',
         's3_key',
         'account',

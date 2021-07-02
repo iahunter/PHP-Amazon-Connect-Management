@@ -8,6 +8,8 @@ use Aws\Connect\ConnectClient;
 use Aws\S3\S3Client; 
 use Aws\Exception\AwsException;
 
+use Illuminate\Database\QueryException; 
+
 use Carbon\Carbon;
 use App\Models\AmazonConnect\Ctr;
 use Illuminate\Support\Facades\DB;
@@ -135,7 +137,22 @@ class GetNewConnectCtrFromS3 extends Command
 					$insert = Ctr::format_record($array);
 					//print_r($insert);
 					//continue;
-					$result = DB::table('connect_ctrs')->insert($insert);
+					try{
+
+						$result = Ctr::firstOrCreate($insert);
+					}catch(QueryException $e){
+						
+						echo 'Caught exception: ',  $e->getMessage(), "\n";
+
+						$record = Ctr::where("contact_id", $insert['contact_id'])
+									->update($insert);
+
+						if(!$record){
+							echo "Could not update Record {$insert['contact_id']}".PHP_EOL; 
+						}else{
+							echo "Updated Record {$insert['contact_id']}".PHP_EOL; 
+						}
+					}
 
 					//print_r($result);
 					//print " ".PHP_EOL;
@@ -160,7 +177,31 @@ class GetNewConnectCtrFromS3 extends Command
 						print_r($array); 
 						//die();
 						//$result = Ctr::insert($insert);
-						$result = DB::table('connect_ctrs')->insert($insert);
+						try{
+							//$result = DB::table('connect_ctrs')->insert($insert);
+							$result = Ctr::firstOrCreate($insert);
+						}catch(QueryException $e){
+							
+							echo 'Caught exception: ',  $e->getMessage(), "\n";
+
+							//die();
+
+							$record = Ctr::where("contact_id", $insert['contact_id'])
+										->update($insert);
+
+							//print_r($record);
+
+							if(!$record){
+								echo "Could not update Record {$insert['contact_id']}".PHP_EOL; 
+							}else{
+								echo "Updated Record {$insert['contact_id']}".PHP_EOL; 
+							}
+
+							//die();
+
+							continue;
+						}
+						
 						//print_r($result);
 					}
 
