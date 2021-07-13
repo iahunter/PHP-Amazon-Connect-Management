@@ -75,6 +75,9 @@ apt install -y git
 # Install Supervisor to start workers. 
 apt install -y supervisor
 
+# Install AWS CLI
+apt install awscli
+
 # Create the DATABASE
 DBNAME="acm"
 echo "Adding mysql database $DBNAME"
@@ -96,6 +99,8 @@ query="GRANT ALL PRIVILEGES ON $DBNAME.* TO '$DBUSER'@'%'";
 mysql -e "$query"
 mysql -e "flush privileges"
 
+service nginx restart
+
 # Run company specific setup script not included in repo if file exists
 FILE=/opt/php-amazon-connect-management/etc/after.sh
 if test -f "$FILE"; then
@@ -105,3 +110,5 @@ if test -f "$FILE"; then
 else 
 	echo "Install Completed. "
 fi
+
+

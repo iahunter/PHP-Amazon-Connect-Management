@@ -79,7 +79,9 @@ class GetNewConnectCtrFromS3 extends Command
 			));
 
 			$now = Carbon::now();
-			$cutoff = Carbon::now()->subDays(30);
+			$cutoff = Carbon::now()->subDays(60);
+
+			
 
 			//print_r($objects);
 			$key_array = []; 
@@ -96,7 +98,7 @@ class GetNewConnectCtrFromS3 extends Command
 					//print "File is within time window..".PHP_EOL;
 					$key_array[] = "s3://{$bucket}/{$object['Key']}";
 				}else{
-					print "File is outside time window..".PHP_EOL;
+					//print "File is outside time window..".PHP_EOL;
 					continue;
 				}
 			}
@@ -108,7 +110,7 @@ class GetNewConnectCtrFromS3 extends Command
 			$key_array = Ctr::check_db_for_records_return_records_to_insert($key_array); 
 
 			if(empty($key_array)){
-				print "Nothing to insert. Ending Script...".PHP_EOL;
+				print "Nothing to insert after $cutoff. Ending Script...".PHP_EOL;
 				return;
 			}
 
@@ -138,7 +140,6 @@ class GetNewConnectCtrFromS3 extends Command
 					//print_r($insert);
 					//continue;
 					try{
-
 						$result = Ctr::firstOrCreate($insert);
 					}catch(QueryException $e){
 						

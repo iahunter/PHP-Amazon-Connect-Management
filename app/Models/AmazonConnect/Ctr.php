@@ -37,9 +37,14 @@ class Ctr extends Model
         'disconnect_time', 
         'contact_duration', 
         'disconnect_reason',
+        'initial_contact_id',
+        'previous_contact_id',
+        'next_contact_id',
         'cdr_json',
     ];
 
+    // TODO Mysql querie for API... 
+    // select initiation_method, contact_id, initial_contact_id, previous_contact_id, next_contact_id, customer_endpoint, system_endpoint from connect_ctrs;
 
     public static function check_db_for_record($key)
     {
@@ -208,6 +213,24 @@ class Ctr extends Model
 					$insert['disconnect_reason'] = $array['DisconnectReason'];
 				}else{
 					$insert['disconnect_reason'] = null;
+				}
+
+                if(isset($array['InitialContactId'])){
+					$insert['initial_contact_id'] = $array['InitialContactId'];
+				}else{
+					$insert['initial_contact_id'] = null;
+				}
+
+                if(isset($array['PreviousContactId'])){
+					$insert['previous_contact_id'] = $array['PreviousContactId'];
+				}else{
+					$insert['previous_contact_id'] = null;
+				}
+
+                if(isset($array['NextContactId'])){
+					$insert['next_contact_id'] = $array['NextContactId'];
+				}else{
+					$insert['next_contact_id'] = null;
 				}
 
 				$insert['cdr_json'] = json_encode($array); 
