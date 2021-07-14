@@ -41,37 +41,8 @@ Route::middleware('api')->get('/hello', function (Request $request) {
     return 'hello world';
 }); 
 
-/*
-Route::middleware('auth:api')->get('/user', function (Request $request) {
-    return $request->user();
-});
-*/
+require __DIR__ . '/api.connect.ctrs.php'; 
 
-/**
- * @OA\Get(
- *   path="/api/ctrs",
- *   tags={"Group"},
- *     summary="Get List of Ctrs",
- *     description="",
- *   @OA\Response(
- *     response=200,
- *     description="successful operation"
- *   ),
- *	 security={
- *     {"passport": {}},
- *   },
- * )
- **/
-
-use App\Http\Controllers\ConnectCtrController;
-
-Route::apiResource('ctrs', ConnectCtrController::class);
-
-//Route::middleware('api')->get('/ctrs', 'ConnectCtrController::class, @index')->name('ctrs');
-//Route::get('/ctrs', [UserController::class, 'index']);
-
-
-//Route::get('/ctrs', [ConnectCtrController::class, 'index']);
-
+require __DIR__ . '/api.connect.instance.php'; 
 
 
