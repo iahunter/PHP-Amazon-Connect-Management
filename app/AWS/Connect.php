@@ -319,6 +319,16 @@ class Connect
                     continue;
                 }
                 
+                if($getresult){
+                    $quickconnects = $this->ConnectClient->listQueueQuickConnects([
+                        'QueueId' => $i['Id'],
+                        'InstanceId' => $instance['Id'],
+                    ]);
+                }
+
+                if(isset($quickconnects['QuickConnectSummaryList'])){
+                    $getresult['Queue']['QuickConnectSummaryList'] = $quickconnects['QuickConnectSummaryList']; 
+                }
                 
                 //print_r($getresult);
                 $list[] = $getresult['Queue'];

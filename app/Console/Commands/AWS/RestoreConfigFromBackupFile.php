@@ -72,6 +72,8 @@ class RestoreConfigFromBackupFile extends Command
 
         $this->backup = json_decode($backup); 
 
+
+
         print_r($this->backup); 
 
         /*
@@ -82,6 +84,7 @@ class RestoreConfigFromBackupFile extends Command
         }
         */
 
+        
         echo "###################################################".PHP_EOL;
         echo "                Restore to Instance                ".PHP_EOL;
         echo "###################################################".PHP_EOL;
@@ -115,7 +118,7 @@ class RestoreConfigFromBackupFile extends Command
         $region = $this->choice('Plese choose the region of the instance to restore.', $regions);
 
 
-        $client = new ConnectClient([
+        $this->ConnectClient = new ConnectClient([
             'version'     => 'latest',
             'region'      => $region,
             'credentials' => [
@@ -125,7 +128,7 @@ class RestoreConfigFromBackupFile extends Command
         ]); 
 
         try{
-            $result = $client->listInstances();
+            $result = $this->ConnectClient->listInstances();
             //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -155,11 +158,127 @@ class RestoreConfigFromBackupFile extends Command
 
         print_r($keyindex[$instance]); 
 
-        $instace_id = $keyindex[$instance]['Id']; 
+        $this->instace_id = $keyindex[$instance]['Id']; 
 
+        $this->manual = [];
+        
+
+        // Jobs to restore
+        $this->restore_hours_of_operation(); 
+        $this->restore_queues(); 
+
+        // Jobs that have to be done manually via the GUI because of lack of API support.
+        print_r($this->manual); 
+        
+
+    }
+
+    public function restore_queues(){
         try{
-            $result = $client->listHoursOfOperations([
-                'InstanceId' => $instace_id, // REQUIRED
+            $result = $this->ConnectClient->listQueues([
+                'InstanceId' => $this->instace_id, // REQUIRED
+            ]);
+            print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_queues = $result['QueueSummaryList']; 
+
+        // set array keys to queue name. 
+        $current_queues = []; 
+        foreach($instance_queues as $queue){
+            $current_queues[$queue['Name']] = $queue; 
+        }
+
+        $Queues = $this->backup->Queues;
+
+
+
+        foreach($Queues as $object){
+
+            // Extract the variables we need to build the queue from backup. 
+            $name = $object->Name; 
+            $description = $object->Description; 
+            $hours_id = $object->HoursOfOperationId; 
+            
+            // Loop thru and try to find the Hours of Operation ID Name so we can try to find the new one that was created. 
+            
+            try{
+                $result = $this->ConnectClient->listHoursOfOperations([
+                    'InstanceId' => $this->instace_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+    
+            $instance_hours = $result['HoursOfOperationSummaryList']; 
+            
+            foreach($this->backup->HoursOfOperations as $i){
+                if($i->HoursOfOperationId ==  $hours_id){
+                    $hours_name = $i->Name; 
+                }
+            }
+
+            foreach($instance_hours as $hours){
+                if($hours['Name'] == $hours_name){
+                    $hours_id = $hours['Id']; 
+                }
+            }
+
+            $queue = [
+                'InstanceId' => $this->instace_id, // REQUIRED
+                'Description' => $description,
+                'HoursOfOperationId' => $hours_id, // REQUIRED
+                //'MaxContacts' => '<integer>',
+                'Name' => $name, // REQUIRED
+                
+                //'QuickConnectIds' => ['<string>'],
+                //'Tags' => ['<string>'],
+            ]; 
+
+            if(isset($object->OutboundCallerConfig)){
+                $callerid_name = $object->OutboundCallerConfig->OutboundCallerIdName; 
+                $queue['OutboundCallerConfig'] = [
+                    'OutboundCallerIdName' => $callerid_name,
+                    //'OutboundCallerIdNumberId' => '<string>',
+                    //'OutboundFlowId' => '<string>',
+                ];
+            }
+
+            if(!array_key_exists($name, $current_queues)){
+
+                print_r($object); 
+
+                $this->manual[] = $object; 
+
+                
+
+                try{
+                    $result = $this->ConnectClient->createQueue($queue);
+                    print_r($result);
+                    print "Created Queue $name!!!".PHP_EOL; 
+                }catch(AwsException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    return;
+                }
+
+            }else{
+                print "Queue $name exists... update to the backup state".PHP_EOL; 
+            }
+        }
+
+        return;
+    }
+
+
+    public function restore_hours_of_operation(){
+        try{
+            $result = $this->ConnectClient->listHoursOfOperations([
+                'InstanceId' => $this->instace_id, // REQUIRED
             ]);
             print_r($result);
         }catch(AwsException $e){
@@ -186,9 +305,12 @@ class RestoreConfigFromBackupFile extends Command
 
                 print_r($hours); 
 
+                $this->manual[] = $hours; 
+
             }
         }
 
+        return;
     }
 
 

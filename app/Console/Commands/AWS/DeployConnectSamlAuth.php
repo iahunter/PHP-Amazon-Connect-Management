@@ -364,7 +364,7 @@ END;
         $appKeys = [];
 
         $types = ['admins', 'agents'];
-        //$types = ['agents'];
+        $types = ['users'];
 
         foreach($types as $type){
 
