@@ -140,6 +140,7 @@ class BackupConnectInstances extends Command
                     $storage = $ConnectInstance->backupStorageConfigs($instance); 
                     $instanceAttributes = $ConnectInstance->backupInstanceAttributes($instance); 
                     $numbers = $ConnectInstance->backupPhoneNumbers($instance); 
+                    $prompts = $ConnectInstance->backupPrompts($instance);
                     $flows = $ConnectInstance->backupContactFlows($instance);
                     $users = $ConnectInstance->backupUsers($instance);
                     $uhgs = $ConnectInstance->backupUserHierarchyGroups($instance);
@@ -153,6 +154,7 @@ class BackupConnectInstances extends Command
                     $backup['StorageConfigs'] = $storage; 
                     $backup['InstanceAttributes'] = $instanceAttributes;
                     $backup['PhoneNumbers'] = $numbers;
+                    $backup['Prompts'] = $prompts;
                     $backup['ContactFlows'] = $flows;
                     $backup['Users'] = $users;
                     $backup['UserHierarchyGroups'] = $uhgs;

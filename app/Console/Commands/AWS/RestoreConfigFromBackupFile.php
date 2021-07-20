@@ -9,6 +9,9 @@ use App\Models\Company;
 use App\Models\Account;
 use Aws\Connect\ConnectClient;
 
+use Aws\Exception\AwsException; 
+use Aws\Connect\Exception\ConnectException; 
+
 
 use Illuminate\Console\Command;
 
@@ -158,14 +161,16 @@ class RestoreConfigFromBackupFile extends Command
 
         print_r($keyindex[$instance]); 
 
-        $this->instace_id = $keyindex[$instance]['Id']; 
+        $this->instance_id = $keyindex[$instance]['Id']; 
+        $this->instance = $keyindex[$instance]; 
 
         $this->manual = [];
         
 
         // Jobs to restore
-        $this->restore_hours_of_operation(); 
-        $this->restore_queues(); 
+        //$this->restore_hours_of_operation(); 
+        //$this->restore_queues(); 
+        $this->restore_contact_flows();
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
         print_r($this->manual); 
@@ -173,10 +178,153 @@ class RestoreConfigFromBackupFile extends Command
 
     }
 
+    public function restore_contact_flows(){
+        try{
+            $result = $this->ConnectClient->listContactFlows([
+                'InstanceId' => $this->instance['Id'], // REQUIRED
+            ]);
+            print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_flows = $result['ContactFlowSummaryList']; 
+
+        // set array keys to queue name. 
+        $current_flows = []; 
+        foreach($instance_flows as $flow){
+            $current_flows[$flow['Name']] = $flow; 
+        }
+
+        $ContactFlows = $this->backup->ContactFlows;
+
+        // Get prompts to replace 
+        try{
+            $result = $this->ConnectClient->listPrompts([
+                'InstanceId' => $this->instance['Id'], // REQUIRED
+            ]);
+            print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $prompts = []; 
+
+        // Get Source Prompts
+        $backup_prompts = $this->backup->Prompts;
+
+        foreach($backup_prompts as $prompt){
+            $prompt = json_decode(json_encode($prompt), true); 
+            print_r($prompt); 
+            if(!array_key_exists($prompt['Name'], $prompts)){
+                $prompts[$prompt['Name']] = []; 
+            }
+            
+            $prompts[$prompt['Name']]["source"] = $prompt; 
+        }
+
+        // Get Destination Prompts
+        foreach($result['PromptSummaryList'] as $prompt){
+            if(!array_key_exists($prompt['Name'], $prompts)){
+                $prompts[$prompt['Name']] = []; 
+            }
+            
+            $prompts[$prompt['Name']]["destination"] = $prompt; 
+        }
+
+        print_r($prompts); 
+
+        
+
+        // set array keys to queue name. 
+        $current_flows = []; 
+        foreach($instance_flows as $flow){
+            $current_flows[$flow['Name']] = $flow; 
+        }
+
+        $ContactFlows = $this->backup->ContactFlows;
+
+        foreach($ContactFlows as $object){
+
+            // Extract the variables we need to build the queue from backup. 
+            $name = $object->Name; 
+            $type = $object->Type; 
+
+            $content = $object->Content; 
+            $newcontent = ""; 
+            $count = 0; 
+            foreach($prompts as $prompt){
+                if(!$count){
+                    $newcontent = str_replace($prompt['source']['Arn'], $prompt['destination']['Arn'],$content);
+                }else{
+                    $newcontent = str_replace($prompt['source']['Arn'], $prompt['destination']['Arn'],$newcontent);
+                }
+                $count++; 
+                
+                $newcontent = str_replace($prompt['source']['Id'], $prompt['destination']['Id'], $newcontent);
+            }
+
+            $newcontent = str_replace($this->backup->Instance->Arn, $this->instance['Arn'], $newcontent); 
+            $newcontent = str_replace($this->backup->Instance->Id, $this->instance['Id'], $newcontent); 
+            
+            print $this->backup->Instance->Id.PHP_EOL; 
+            print $this->instance['Arn'].PHP_EOL; 
+
+            print_r($newcontent);
+
+            //die();
+
+            $flow = [
+                'Content' => $newcontent, // REQUIRED
+                //'Description' => '<string>',
+                'InstanceId' => $this->instance_id, // REQUIRED
+                'Name' => $name, // REQUIRED
+                //'Tags' => ['<string>', ...],
+                'Type' => $type, // REQUIRED
+            ]; 
+
+            if(property_exists($object, "Description")){
+                $flow['Description'] = $object->Description; 
+            }
+
+
+            if(!array_key_exists($name, $current_flows)){
+
+                //print_r($object); 
+
+                $this->manual[] = $object; 
+
+                print_r($flow); 
+
+               
+
+                try{
+                    $result = $this->ConnectClient->createContactFlow($flow);
+                    print_r($result);
+                    print "Created Flow $name!!!".PHP_EOL; 
+                }catch(ConnectException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    die();
+                    return;
+
+                }
+
+            }else{
+                print "ContactFlow $name exists... update to the backup state".PHP_EOL; 
+                
+                /* TODO - ADD Overwrite functionality */
+            }
+        }
+
+        return;
+    }
+
     public function restore_queues(){
         try{
             $result = $this->ConnectClient->listQueues([
-                'InstanceId' => $this->instace_id, // REQUIRED
+                'InstanceId' => $this->instance_id, // REQUIRED
             ]);
             print_r($result);
         }catch(AwsException $e){
@@ -207,7 +355,7 @@ class RestoreConfigFromBackupFile extends Command
             
             try{
                 $result = $this->ConnectClient->listHoursOfOperations([
-                    'InstanceId' => $this->instace_id, // REQUIRED
+                    'InstanceId' => $this->instance_id, // REQUIRED
                 ]);
                 print_r($result);
             }catch(AwsException $e){
@@ -230,7 +378,7 @@ class RestoreConfigFromBackupFile extends Command
             }
 
             $queue = [
-                'InstanceId' => $this->instace_id, // REQUIRED
+                'InstanceId' => $this->instance_id, // REQUIRED
                 'Description' => $description,
                 'HoursOfOperationId' => $hours_id, // REQUIRED
                 //'MaxContacts' => '<integer>',
@@ -268,6 +416,8 @@ class RestoreConfigFromBackupFile extends Command
 
             }else{
                 print "Queue $name exists... update to the backup state".PHP_EOL; 
+                
+                /* TODO - ADD Overwrite functionality */
             }
         }
 
@@ -278,7 +428,7 @@ class RestoreConfigFromBackupFile extends Command
     public function restore_hours_of_operation(){
         try{
             $result = $this->ConnectClient->listHoursOfOperations([
-                'InstanceId' => $this->instace_id, // REQUIRED
+                'InstanceId' => $this->instance_id, // REQUIRED
             ]);
             print_r($result);
         }catch(AwsException $e){

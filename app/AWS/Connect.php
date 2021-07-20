@@ -399,6 +399,25 @@ class Connect
         return $list;
     }
 
+    public function backupPrompts($instance){
+
+        // Get Custom Flows and Store in the Database
+        $prompts = $this->ConnectClient->listPrompts([
+            'InstanceId' => $instance['Id'],
+        ]);
+
+        $list = [];
+
+        if(isset($prompts['PromptSummaryList']) && count($prompts['PromptSummaryList'])){
+            return $prompts['PromptSummaryList']; 
+        }
+    }
+
+
+    public function blankContactFlowContent($instance){
+
+        $content = null;
+    }
 
 
 }
