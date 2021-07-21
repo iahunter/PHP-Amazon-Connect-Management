@@ -414,10 +414,7 @@ class Connect
     }
 
 
-    public function blankContactFlowContent($instance){
 
-        $content = null;
-    }
 
 
 }
