@@ -229,9 +229,21 @@ class Connect
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
                     continue;
                 }
+
+                // Need to possibly queue these jobs in case they error out. 
+                try{
+                    $queues = $this->backupRoutingProfileQueues($instance, $i['Id']);
+
+                }catch(AwsException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    continue;
+                }
+
+                $profiles = $getresult['RoutingProfile']; 
+                $profiles['RoutingProfileQueueConfigSummaryList'] = $queues;
                 
                 //print_r($getresult);
-                $list[] = $getresult['RoutingProfile'];
+                $list[] = $profiles;
             }
         }
 
@@ -278,20 +290,7 @@ class Connect
 
         if(isset($profiles['RoutingProfileQueueConfigSummaryList']) && count($profiles['RoutingProfileQueueConfigSummaryList'])){
             foreach($profiles['RoutingProfileQueueConfigSummaryList'] as $i){
-                // Need to possibly queue these jobs in case they error out. 
-                try{
-                    $getresult = $this->ConnectClient->describeRoutingProfile([
-                        'RoutingProfileId' => $i['Id'],
-                        'InstanceId' => $instance['Id'],
-                    ]);
-                }catch(AwsException $e){
-                    echo 'Caught exception: ',  $e->getMessage(), "\n";
-                    continue;
-                }
-                
-                
-                //print_r($getresult);
-                $list[] = $getresult['RoutingProfile'];
+                $list[] = $i;
             }
         }
 
@@ -412,9 +411,6 @@ class Connect
             return $prompts['PromptSummaryList']; 
         }
     }
-
-
-
 
 
 }

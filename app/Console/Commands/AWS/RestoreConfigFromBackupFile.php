@@ -171,7 +171,7 @@ class RestoreConfigFromBackupFile extends Command
         //$this->restore_hours_of_operation(); 
         //$this->restore_queues(); 
         //$this->restore_contact_flow_names();
-        $this->restore_contact_flow_content();
+        //$this->restore_contact_flow_content();
 
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
