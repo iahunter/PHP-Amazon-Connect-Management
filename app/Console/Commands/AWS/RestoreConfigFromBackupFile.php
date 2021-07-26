@@ -172,12 +172,229 @@ class RestoreConfigFromBackupFile extends Command
         //$this->restore_queues(); 
         //$this->restore_contact_flow_names();
         //$this->restore_contact_flow_content();
+        $this->restore_routing_profiles();
 
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
         print_r($this->manual); 
         
 
+    }
+
+    public function restore_routing_profiles(){
+        
+
+        try{
+            $result = $this->ConnectClient->listQueues([
+                'InstanceId' => $this->instance_id, // REQUIRED
+            ]);
+            //print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_queues = $result['QueueSummaryList']; 
+
+        $queues = []; 
+        foreach($this->backup->Queues as $queue){
+            $queue = json_decode(json_encode($queue), true); 
+            //print_r($queue); 
+            if(!array_key_exists($queue['Name'], $queues)){
+                $queues[$queue['Name']] = []; 
+            }
+            
+            $queues[$queue['Name']]["source"] = $queue; 
+        }
+
+        foreach($instance_queues as $queue){
+            if(!array_key_exists($queue['Name'], $queues)){
+                $queues[$queue['Name']] = []; 
+            }
+            
+            $queues[$queue['Name']]["destination"] = $queue; 
+        }
+
+        //print_r($queues); 
+
+
+        $RoutingProfiles = $this->backup->RoutingProfiles;
+
+        foreach($RoutingProfiles as $object){
+
+            
+            $array = $object->RoutingProfileQueueConfigSummaryList;
+            $set = 0; 
+            $new_array = []; 
+            foreach($array as $q){
+                $string = json_encode($q); 
+                
+                $count = 0; 
+                $newcontent = ""; 
+
+                $string = stripslashes($string);
+                
+                foreach($queues as $queue){
+
+                    //print_r($queue); 
+
+                    if(!$count){
+                        $newcontent = str_replace($queue['source']['QueueArn'], $queue['destination']['Arn'], $string);
+                    }else{
+                        $newcontent = str_replace($queue['source']['QueueArn'], $queue['destination']['Arn'], $newcontent);
+                    }
+                    $count++; 
+                    $newcontent = str_replace($queue['source']['QueueId'], $queue['destination']['Id'], $newcontent);
+
+                    if(!$set){
+                        print $object->DefaultOutboundQueueId.PHP_EOL; 
+                        $defaultOutboundQueueId = str_replace($queue['source']['QueueId'], $queue['destination']['Id'], $object->DefaultOutboundQueueId);
+                        print $defaultOutboundQueueId.PHP_EOL; 
+                        if($defaultOutboundQueueId != $object->DefaultOutboundQueueId){
+                            $set = 1; 
+                        }
+                    }
+                }
+
+                $newcontent = json_decode($newcontent); 
+
+                $new_array[] = $newcontent; 
+            }
+            
+            print_r($new_array);
+
+            print "Default Queue ID: ".$defaultOutboundQueueId.PHP_EOL; 
+
+
+            // Build Queue Member Array
+            $qs = []; 
+            foreach($new_array as $array){
+                $queue = [
+                            'Delay' => $array->Delay, // REQUIRED
+                            'Priority' => $array->Priority, // REQUIRED
+                            'QueueReference' => [ // REQUIRED
+                                'Channel' => $array->Channel, // REQUIRED
+                                'QueueId' => $array->QueueId, // REQUIRED
+                            ],
+                        ]; 
+
+                $qs[] = $queue; 
+            }
+            $queueConfigs = $qs; 
+
+            $medias = []; 
+            foreach($object->MediaConcurrencies as $i){
+                $i->Concurrency = 1; 
+                $array = json_decode(json_encode($i), true);
+                $medias[] = $array; 
+            }
+
+            $mediaConcurrencies = json_decode(json_encode($object->MediaConcurrencies), true);
+
+            print_r($mediaConcurrencies); 
+            
+            // Build Routing Profile and assign Queue Members
+            $profile = [
+                'DefaultOutboundQueueId' => $defaultOutboundQueueId, // REQUIRED
+                'Description' => $object->Description, // REQUIRED
+                'InstanceId' => $this->instance_id, // REQUIRED
+                'MediaConcurrencies' => $medias, 
+                'Name' => $object->Name, // REQUIRED
+                'QueueConfigs' => $queueConfigs,
+                //'Tags' => ['<string>', ...],
+            ]; 
+
+            try{
+                $result = $this->ConnectClient->listRoutingProfiles([
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            $instance_routing_profiles = $result['RoutingProfileSummaryList']; 
+
+            // set array keys to queue name. 
+            $current_profiles = []; 
+            foreach($instance_routing_profiles as $p){
+                $current_profiles[$p['Name']] = $p; 
+            }
+
+            if(!array_key_exists($object->Name, $current_profiles)){
+
+                //print_r($object); 
+
+                $this->manual[] = $object; 
+
+                print_r($profile); 
+
+               
+
+                try{
+                    $result = $this->ConnectClient->createRoutingProfile($profile);
+                    print_r($result);
+                    print "Created Routing Profile $object->Name!!!".PHP_EOL; 
+                }catch(ConnectException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    die();
+                    return;
+
+                }
+
+            }else{
+                print "ContactFlow $object->Name exists... Need to update the object to reflect backup configuration".PHP_EOL; 
+                
+                /* TODO - ADD Overwrite functionality */
+            }
+
+            try{
+                $result = $this->ConnectClient->listRoutingProfiles([
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            
+
+            $instance_routing_profiles = $result['RoutingProfileSummaryList']; 
+
+            // set array keys to queue name. 
+            $current_profiles = []; 
+            foreach($instance_routing_profiles as $p){
+                $current_profiles[$p['Name']] = $p; 
+            }
+
+            print_r($current_profiles); 
+
+            if(isset($current_profiles[$object->Name])){
+                $routingProfile = $current_profiles[$object->Name];
+                print_r($routingProfile); 
+                
+                $update = [
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                    'MediaConcurrencies' => $mediaConcurrencies,
+                    'RoutingProfileId' => $routingProfile['Id'], // REQUIRED
+                ]; 
+    
+                
+                // Update the concurrency limits for the routing profile. 
+                try{
+                    $result = $this->ConnectClient->updateRoutingProfileConcurrency($update);
+                    print_r($result);
+                    print "Updated Routing Profile $object->Name!!!".PHP_EOL; 
+                }catch(ConnectException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    die();
+                    return;
+    
+                }
+            }
+        }
     }
 
     public function restore_contact_flow_names(){
