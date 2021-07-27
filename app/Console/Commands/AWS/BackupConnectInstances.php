@@ -146,6 +146,7 @@ class BackupConnectInstances extends Command
                     $uhgs = $ConnectInstance->backupUserHierarchyGroups($instance);
                     $structure = $ConnectInstance->backupUserHierarchyStructure($instance);
                     $routingProfiles = $ConnectInstance->backupRoutingProfiles($instance);
+                    $securityProfiles = $ConnectInstance->backupSecurityProfiles($instance);
                     $queues = $ConnectInstance->backupQueues($instance);
                     $hours = $ConnectInstance->backupHoursOfOperations($instance);
                     $quickConnects = $ConnectInstance->backupQuickConnects($instance);
@@ -160,6 +161,7 @@ class BackupConnectInstances extends Command
                     $backup['UserHierarchyGroups'] = $uhgs;
                     $backup['UserHierarchyStructure'] = $structure;
                     $backup['RoutingProfiles'] = $routingProfiles;
+                    $backup['SecurityProfiles'] = $securityProfiles;
                     $backup['Queues'] = $queues;
                     $backup['HoursOfOperations'] = $hours;
                     $backup['QuickConnects'] = $quickConnects;

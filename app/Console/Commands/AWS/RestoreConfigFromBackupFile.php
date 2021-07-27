@@ -172,13 +172,184 @@ class RestoreConfigFromBackupFile extends Command
         //$this->restore_queues(); 
         //$this->restore_contact_flow_names();
         //$this->restore_contact_flow_content();
-        $this->restore_routing_profiles();
+        //$this->restore_routing_profiles();
+        $this->restore_users();
 
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
         print_r($this->manual); 
         
 
+    }
+
+    public function restore_users(){
+        
+        // Get Routing Profiles from backup and compare Instnace Routing Profiles
+        try{
+            $result = $this->ConnectClient->listRoutingProfiles([
+                'InstanceId' => $this->instance_id, // REQUIRED
+            ]);
+            //print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_routing_profiles = $result['RoutingProfileSummaryList']; 
+
+        $routing_profiles = []; 
+        foreach($this->backup->RoutingProfiles as $profile){
+            $profile = json_decode(json_encode($profile), true); 
+            //print_r($profile); 
+            if(!array_key_exists($profile['Name'], $routing_profiles)){
+                $routing_profiles[$profile['Name']] = []; 
+            }
+            
+            $routing_profiles[$profile['Name']]["source"] = $profile; 
+        }
+
+        foreach($instance_routing_profiles as $profile){
+            if(!array_key_exists($profile['Name'], $routing_profiles)){
+                $routing_profiles[$profile['Name']] = []; 
+            }
+            
+            $routing_profiles[$profile['Name']]["destination"] = $profile; 
+        }
+
+        print_r($routing_profiles); 
+
+        
+
+        // Get Routing Profiles from backup and compare Instnace Routing Profiles
+        try{
+            $result = $this->ConnectClient->listSecurityProfiles([
+                'InstanceId' => $this->instance_id, // REQUIRED
+            ]);
+            //print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_security_profiles = $result['SecurityProfileSummaryList']; 
+
+        $security_profiles = []; 
+        foreach($this->backup->SecurityProfiles as $profile){
+            $profile = json_decode(json_encode($profile), true); 
+            //print_r($profile); 
+            if(!array_key_exists($profile['Name'], $security_profiles)){
+                $security_profiles[$profile['Name']] = []; 
+            }
+            
+            $security_profiles[$profile['Name']]["source"] = $profile; 
+        }
+
+        foreach($instance_security_profiles as $profile){
+            if(!array_key_exists($profile['Name'], $security_profiles)){
+                $security_profiles[$profile['Name']] = []; 
+            }
+            
+            $security_profiles[$profile['Name']]["destination"] = $profile; 
+        }
+
+        print_r($security_profiles); 
+
+        
+
+
+        $Users = $this->backup->Users;
+
+        foreach($Users as $object){
+
+            $string = json_encode($object); 
+            $count = 0; 
+            foreach($routing_profiles as $i){
+
+                //print_r($queue); 
+
+                if(!$count){
+                    $newcontent = str_replace($i['source']['RoutingProfileArn'], $i['destination']['Arn'], $string);
+                }else{
+                    $newcontent = str_replace($i['source']['RoutingProfileArn'], $i['destination']['Arn'], $newcontent);
+                }
+                $count++; 
+                $newcontent = str_replace($i['source']['RoutingProfileId'], $i['destination']['Id'], $newcontent);
+            }
+
+            foreach($security_profiles as $i){
+                $newcontent = str_replace($i['source']['Arn'], $i['destination']['Arn'], $newcontent);
+                $newcontent = str_replace($i['source']['Id'], $i['destination']['Id'], $newcontent);
+            }
+
+            $newcontent = json_decode($newcontent); 
+
+            print_r($newcontent); 
+
+            $new_user = json_decode(json_encode($newcontent), true); 
+
+            print_r($new_user); 
+
+            try{
+                $result = $this->ConnectClient->listUsers([
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            $instance_users = $result['UserSummaryList']; 
+
+            // set array keys to queue name. 
+            $current_users = []; 
+            foreach($instance_users as $u){
+                $current_users[$u['Username']] = $u; 
+            }
+
+            unset($new_user['Id']);
+            unset($new_user['Arn']);
+            unset($new_user['DirectoryUserId']);
+            unset($new_user['PhoneConfig']['DeskPhoneNumber']);
+
+            $new_user['InstanceId'] = $this->instance_id; 
+
+            $new_user['InstanceId'] = $this->instance_id; 
+            
+            print_r($new_user); 
+
+
+            if(!array_key_exists($new_user['Username'], $current_users)){
+
+                //print_r($object); 
+
+                $this->manual[] = $new_user; 
+
+                print_r($new_user); 
+
+               
+
+                try{
+                    $result = $this->ConnectClient->createUser($new_user);
+                    print_r($result);
+                    print "Created User {$new_user['Username']}!!!".PHP_EOL; 
+                }catch(ConnectException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    die();
+                    return;
+
+                }
+
+            }else{
+                print "User {$new_user['Username']} exists... Need to update the object to reflect backup configuration".PHP_EOL; 
+                
+                /* TODO - ADD Overwrite functionality */
+            }
+
+            sleep(2);
+
+        }
+    
     }
 
     public function restore_routing_profiles(){

@@ -252,18 +252,21 @@ class Connect
 
     public function backupSecurityProfiles($instance){
         // Get Custom Flows and Store in the Database
-        $profiles = $this->ConnectClient->listRoutingProfiles([
+        $profiles = $this->ConnectClient->listSecurityProfiles([
             'InstanceId' => $instance['Id'],
         ]);
 
         $list = [];
 
         if(isset($profiles['SecurityProfileSummaryList']) && count($profiles['SecurityProfileSummaryList'])){
+            
+            // AWS Lacks Describe Security Profile at the moment. May add when they make it available from API. 
+            /*
             foreach($profiles['SecurityProfileSummaryList'] as $i){
                 // Need to possibly queue these jobs in case they error out. 
                 try{
-                    $getresult = $this->ConnectClient->describeRoutingProfile([
-                        'RoutingProfileId' => $i['Id'],
+                    $getresult = $this->ConnectClient->describeSecurityProfileProfile([
+                        'SecurityProfileId' => $i['Id'],
                         'InstanceId' => $instance['Id'],
                     ]);
                 }catch(AwsException $e){
@@ -273,7 +276,8 @@ class Connect
                 
                 //print_r($getresult);
                 $list[] = $getresult['RoutingProfile'];
-            }
+            }*/
+            $list = $profiles['SecurityProfileSummaryList']; 
         }
 
         return $list;
