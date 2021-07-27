@@ -173,13 +173,200 @@ class RestoreConfigFromBackupFile extends Command
         //$this->restore_contact_flow_names();
         //$this->restore_contact_flow_content();
         //$this->restore_routing_profiles();
-        $this->restore_users();
+        //$this->restore_users();
+        $this->restore_quickconnects();
 
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
         print_r($this->manual); 
         
 
+    }
+
+    public function restore_quickconnects(){
+        
+        try{
+            $result = $this->ConnectClient->listQueues([
+                'InstanceId' => $this->instance_id, // REQUIRED
+            ]);
+            //print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_queues = $result['QueueSummaryList']; 
+
+        print_r($instance_queues); 
+
+        $queues = []; 
+        foreach($this->backup->Queues as $queue){
+            $queue = json_decode(json_encode($queue), true); 
+            //print_r($queue); 
+            if(!isset($queue['Name'])){
+                continue;
+            }
+            if(!array_key_exists($queue['Name'], $queues)){
+                $queues[$queue['Name']] = []; 
+            }
+            
+            $queues[$queue['Name']]["source"] = $queue; 
+        }
+
+        foreach($instance_queues as $queue){
+            if(!isset($queue['Name'])){
+                continue;
+            }
+            if(!array_key_exists($queue['Name'], $queues)){
+                $queues[$queue['Name']] = []; 
+            }
+            
+            $queues[$queue['Name']]["destination"] = $queue; 
+        }
+
+        print_r($queues); 
+
+        try{
+            $result = $this->ConnectClient->listContactFlows([
+                'InstanceId' => $this->instance['Id'], // REQUIRED
+            ]);
+            print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_flows = $result['ContactFlowSummaryList']; 
+
+        // set array keys to queue name. 
+        $current_flows = []; 
+        foreach($instance_flows as $flow){
+            $current_flows[$flow['Name']] = $flow; 
+        }
+
+
+        $ContactFlows = $this->backup->ContactFlows;
+
+        $flows = []; 
+
+        // Get Source Flow
+        foreach($ContactFlows as $flow){
+            $flow = json_decode(json_encode($flow), true); 
+            print_r($flow); 
+            if(!array_key_exists($flow['Name'], $flows)){
+                $flows[$flow['Name']] = []; 
+            }
+            
+            $flows[$flow['Name']]["source"] = $flow; 
+        }
+
+        // Get Destination Flow
+        foreach($instance_flows as $flow){
+            if(!array_key_exists($flow['Name'], $flows)){
+                $flows[$flow['Name']] = []; 
+            }
+            
+            $flows[$flow['Name']]["destination"] = $flow; 
+        }
+
+        //print_r($flows); 
+
+        $QuickConnects = $this->backup->QuickConnects;
+
+        foreach($QuickConnects as $object){
+
+             
+
+            $string = json_encode($object); 
+            $count = 0; 
+            foreach($queues as $i){
+
+                if(!isset($i['source'])){
+                    continue;
+                }
+
+                if(!$count){
+                    $newcontent = str_replace($i['source']['QueueArn'], $i['destination']['Arn'], $string);
+                }else{
+                    $newcontent = str_replace($i['source']['QueueArn'], $i['destination']['Arn'], $newcontent);
+                }
+                $count++; 
+                $newcontent = str_replace($i['source']['QueueId'], $i['destination']['Id'], $newcontent);
+            }
+
+            foreach($flows as $i){
+                if(!isset($i['source'])){
+                    continue;
+                }
+                print_r($i); 
+                $newcontent = str_replace($i['source']['Arn'], $i['destination']['Arn'], $newcontent);
+                $newcontent = str_replace($i['source']['Id'], $i['destination']['Id'], $newcontent);
+            }
+            print_r($object);
+            $newcontent = json_decode($newcontent); 
+
+            //print_r($newcontent); 
+
+            $new_object = json_decode(json_encode($newcontent), true); 
+
+            //print_r($new_object); 
+
+            //die();
+
+            try{
+                $result = $this->ConnectClient->listQuickConnects([
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            $instance_users = $result['QuickConnectSummaryList']; 
+
+            // set array keys to queue name. 
+            $current_users = []; 
+            foreach($instance_users as $u){
+                $current_users[$u['Name']] = $u; 
+            }
+
+            unset($new_object['QuickConnectId']);
+            unset($new_object['QuickConnectARN']);
+            $new_object['InstanceId'] = $this->instance_id; 
+            
+
+            if(!array_key_exists($new_object['Name'], $current_users)){
+
+                //print_r($object); 
+
+                $this->manual[] = $new_object; 
+
+                print_r($new_object); 
+
+               
+
+                try{
+                    $result = $this->ConnectClient->createQuickConnect($new_object);
+                    print_r($result);
+                    print "Created QuickConnect {$new_object['Name']}!!!".PHP_EOL; 
+                }catch(ConnectException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    die();
+                    return;
+
+                }
+
+            }else{
+                print "QuickConnect {$new_object['Name']} exists... Need to update the object to reflect backup configuration".PHP_EOL; 
+                
+                /* TODO - ADD Overwrite functionality */
+            }
+
+            sleep(2);
+
+        }
+    
     }
 
     public function restore_users(){

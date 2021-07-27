@@ -40,6 +40,8 @@ class Connect
             ]);
             $storage[$type] = $getresult['StorageConfigs']; 
             //print_r($getresult);
+
+            sleep(1);
         }
 
         return $storage; 
@@ -84,8 +86,8 @@ class Connect
         
         //Disregard the default and sample flows
         $discard_regex = [
-            "/^Default/",
-            "/^Sample/",
+            //"/^Default/",
+            //"/^Sample/",
         ];
 
         $custom_flows = [];
@@ -121,6 +123,8 @@ class Connect
                 
                 //print_r($getresult);
                 $custom_flows[] = $getresult['ContactFlow'];
+
+                sleep(1);
             }
         }
 
@@ -152,6 +156,8 @@ class Connect
                 
                 //print_r($getresult);
                 $userlist[] = $getresult['User'];
+
+                sleep(1);
             }
         }
 
@@ -183,6 +189,8 @@ class Connect
                 
                 //print_r($getresult);
                 $list[] = $getresult['HierarchyGroup'];
+
+                sleep(1);
             }
         }
 
@@ -204,6 +212,8 @@ class Connect
         //print_r($getresult);
         if(isset($getresult['HierarchyStructure']) && count($getresult['HierarchyStructure'])){
             $list[] = $getresult['HierarchyStructure'];
+
+            sleep(1);
         }
             
         return $list;
@@ -244,6 +254,8 @@ class Connect
                 
                 //print_r($getresult);
                 $list[] = $profiles;
+
+                sleep(1);
             }
         }
 
@@ -295,6 +307,8 @@ class Connect
         if(isset($profiles['RoutingProfileQueueConfigSummaryList']) && count($profiles['RoutingProfileQueueConfigSummaryList'])){
             foreach($profiles['RoutingProfileQueueConfigSummaryList'] as $i){
                 $list[] = $i;
+
+                sleep(1);
             }
         }
 
@@ -311,30 +325,44 @@ class Connect
 
         if(isset($queues['QueueSummaryList']) && count($queues['QueueSummaryList'])){
             foreach($queues['QueueSummaryList'] as $i){
-                // Need to possibly queue these jobs in case they error out. 
-                try{
-                    $getresult = $this->ConnectClient->describeQueue([
-                        'QueueId' => $i['Id'],
-                        'InstanceId' => $instance['Id'],
-                    ]);
-                }catch(AwsException $e){
-                    echo 'Caught exception: ',  $e->getMessage(), "\n";
-                    continue;
-                }
-                
-                if($getresult){
-                    $quickconnects = $this->ConnectClient->listQueueQuickConnects([
-                        'QueueId' => $i['Id'],
-                        'InstanceId' => $instance['Id'],
-                    ]);
-                }
 
-                if(isset($quickconnects['QuickConnectSummaryList'])){
-                    $getresult['Queue']['QuickConnectSummaryList'] = $quickconnects['QuickConnectSummaryList']; 
+                $getresult = $i;
+                // Need to possibly queue these jobs in case they error out. 
+                if(isset($i['Name'])){
+                    try{
+                        $getresult = $this->ConnectClient->describeQueue([
+                            'QueueId' => $i['Id'],
+                            'InstanceId' => $instance['Id'],
+                        ]);
+                    }catch(AwsException $e){
+                        echo 'Caught exception: ',  $e->getMessage(), "\n";
+                        //sleep(1);
+                        continue;
+                    }
+                    
+                    if($getresult){
+                        $quickconnects = $this->ConnectClient->listQueueQuickConnects([
+                            'QueueId' => $i['Id'],
+                            'InstanceId' => $instance['Id'],
+                        ]);
+                    }
+
+                    if(isset($quickconnects['QuickConnectSummaryList'])){
+                        $getresult['Queue']['QuickConnectSummaryList'] = $quickconnects['QuickConnectSummaryList']; 
+                    }
+                    
+                    $list[] = $getresult['Queue'];
+
+                }else{
+                    //print_r($i); 
+                    //print_r($getresult);
+                    
+                    $list[] = $getresult;
+
+                    sleep(1);
                 }
                 
-                //print_r($getresult);
-                $list[] = $getresult['Queue'];
+                
             }
         }
 
@@ -365,6 +393,8 @@ class Connect
                 
                 //print_r($getresult);
                 $list[] = $getresult['HoursOfOperation'];
+
+                sleep(1);
             }
         }
 
@@ -396,6 +426,8 @@ class Connect
                 
                 //print_r($getresult);
                 $list[] = $getresult['QuickConnect'];
+
+                sleep(1);
             }
         }
 
