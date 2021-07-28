@@ -78,6 +78,9 @@ apt install -y supervisor
 # Install AWS CLI
 apt install awscli
 
+# Install Subversion
+apt install subversion
+
 # Create the DATABASE
 DBNAME="acm"
 echo "Adding mysql database $DBNAME"
@@ -110,5 +113,8 @@ if test -f "$FILE"; then
 else 
 	echo "Install Completed. "
 fi
+
+
+apt install subversion
 
 

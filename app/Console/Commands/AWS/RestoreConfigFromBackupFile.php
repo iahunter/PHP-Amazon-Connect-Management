@@ -1490,11 +1490,11 @@ class RestoreConfigFromBackupFile extends Command
 
                 print "Amazon doesn't have an API for Hours of Operation!!! Ugh... ".PHP_EOL; 
 
-                $choices = [yes,no]; 
+                $choices = ["yes","no"]; 
                 
                 $added = $this->choice('Have you manually added this?', $choices);
 
-                if($added == false){
+                if($added == "no"){
                     print "Please add manually and try again. Good Bye..." ; 
                     die(); 
                 }

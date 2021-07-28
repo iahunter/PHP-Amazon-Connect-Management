@@ -196,6 +196,17 @@ class BackupConnectInstances extends Command
                     
                     //print_r($queues); 
                     //$storage = $Instance->backupStorageConfigs($instance); 
+
+                    $backupname = $backup['Instance']['InstanceAlias'].".json"; 
+
+                    print "Backup Complete: $backupname".PHP_EOL; 
+
+                    $backuppath = storage_path("app/backups/amazon-connect/$backupname"); 
+
+                    touch($backuppath);
+
+                    file_put_contents($backuppath, $json);
+
                 }
             }
                 

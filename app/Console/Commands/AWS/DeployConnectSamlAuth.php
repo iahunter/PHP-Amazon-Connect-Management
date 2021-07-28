@@ -271,7 +271,7 @@ END;
                 if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
                 {
                     $federationArn = $p['Arn'];
-                    print "Found Policy Arn: $arn".PHP_EOL;
+                    print "Found Policy Arn: $federationArn".PHP_EOL;
                     //print_r($arn);
                     break;
                 }
@@ -351,7 +351,7 @@ END;
                 if(isset($p['PolicyName']) && $policy_name == $p['PolicyName'])
                 {
                     $cliPolicyArn = $p['Arn'];
-                    print "Found Policy Arn: $arn".PHP_EOL;
+                    print "Found Policy Arn: $cliPolicyArn".PHP_EOL;
                     //print_r($arn);
                     break;
                 }
@@ -500,7 +500,7 @@ END;
             echo "  Edit SAML Config for $type in Azure AD enterprise App  ".PHP_EOL;
             echo "#########################################################".PHP_EOL;
 
-            if($type == 'admins'){
+            if($type == 'admins' || $type == 'users'){
 
                 $relayState = "https://$this->region.console.aws.amazon.com/connect/federate/$this->instance_id?destination=%2Fconnect%2F";
             }elseif($type == 'agents')
@@ -508,7 +508,7 @@ END;
                 $relayState = "https://$this->region.console.aws.amazon.com/connect/federate/$this->instance_id?destination=%2Fconnect%2Fccp";
 
             }else{
-                print "Unrecognized Type"; 
+                print "Unrecognized Type: $type"; 
                 return;
             }
 
