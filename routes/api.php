@@ -45,4 +45,6 @@ require __DIR__ . '/api.connect.ctrs.php';
 
 require __DIR__ . '/api.connect.instance.php'; 
 
+require __DIR__ . '/api.connect.agents.php'; 
+
 
