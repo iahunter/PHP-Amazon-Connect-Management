@@ -9,11 +9,13 @@ class Agent extends Model
 {
     use HasFactory;
 
-    protected $table = 'connect_agent';
+    protected $table = 'connect_agents';
 	
 	protected $fillable = [
-		'name',
+		'username',
 		'instance_id',
+        'arn',
+        'status',
 		'json'
 	];
 

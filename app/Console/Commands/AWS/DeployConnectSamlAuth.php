@@ -363,8 +363,8 @@ END;
 
         $appKeys = [];
 
-        $types = ['admins', 'agents'];
-        $types = ['users'];
+        //$types = ['admins', 'agents'];
+        $types = ['users']; // Just using one application for admins and agents so agents can see realtime stats in Connect Dashboard. 
 
         foreach($types as $type){
 
@@ -471,6 +471,12 @@ END;
 
             if($cliUserAppKey){
                 print_r($cliUserAppKey);
+                $this->info('Save this App Key: '.$cliUserAppKey['AccessKey']['AccessKeyId']);
+                $this->info('Save this Secret Key: '.$cliUserAppKey['AccessKey']['SecretAccessKey']);
+
+                if ($this->confirm('Do you wish to continue?', true)) {
+                    //
+                }
             }else{
 
                 $keys = $IamClient->listAccessKeys([
@@ -516,8 +522,28 @@ END;
             echo "  Save this URL to enter into Azure AD Enterprise App SAML RelayState ".PHP_EOL;
             echo "######################################################################".PHP_EOL;
 
-            print $relayState; 
+            print $relayState.PHP_EOL; 
 
+            
+
+            /*$this->line($relayState);
+            $this->info($relayState);
+            $this->comment($relayState);
+            */
+            // Print Relay State out in Blue Highhlight
+            $this->question($relayState);
+            /*
+            $this->warn($relayState);
+            // Print Relay State out in Red Highhlight
+            $this->error($relayState);
+            */
+            $continue = false; 
+            while(!$continue){
+                if ($this->confirm('Do you wish to continue?')) {
+                    $continue = true;
+                }
+            }
+            
 
             sleep(10);
 
@@ -528,7 +554,7 @@ END;
 
             $json = json_encode($array_update);
 
-            print $json; 
+            //print $json; 
             
 
             

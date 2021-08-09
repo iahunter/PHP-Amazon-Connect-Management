@@ -17,6 +17,9 @@ class AgentTable extends Migration
             $table->increments('id');
             $table->string('instance_id')->index();    // Parent Block ID
                 $table->foreign('instance_id')->references('instance_id')->on('connect_instances')->onDelete('cascade'); 
+            $table->string('arn')->unique()->index();
+            $table->string('username')->index()->nullable();
+            $table->string('status')->index()->nullable();
             $table->json('json')->nullable();                       // JSON Custom Field Data
 			$table->timestamps();                       // Time Stamps
             $table->softDeletes();                      // Soft Deletes

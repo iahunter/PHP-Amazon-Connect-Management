@@ -188,7 +188,7 @@ class DeployInstance extends Command
 
             if(!in_array($stream_name, $streams['StreamNames'])){
                 $stream = [
-                    'ShardCount' => 10, // REQUIRED
+                    'ShardCount' => 3, // REQUIRED Adjust per your requirements!!!! 
                     'StreamName' => $stream_name, // REQUIRED
                 ];
 
@@ -625,7 +625,7 @@ END;
                     'StorageConfig' => [ // REQUIRED
                         'S3Config' => [
                             'BucketName' => $bucket, // REQUIRED
-                            'BucketPrefix' => $storage_type."-", // REQUIRED
+                            'BucketPrefix' => $storage_type, // REQUIRED
                             /*'EncryptionConfig' => [
                                 'EncryptionType' => 'KMS', // REQUIRED
                                 'KeyId' => $key, // REQUIRED
