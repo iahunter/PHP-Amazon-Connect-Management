@@ -8,6 +8,8 @@ use Aws\Kinesis\KinesisClient;
 use Aws\Connect\ConnectClient;
 use Aws\Exception\AwsException; 
 
+use Aws\Kinesis\Exception; 
+
 use Illuminate\Support\Facades\Crypt;
 use Carbon\Carbon;
 
@@ -212,7 +214,11 @@ class AgentEventMonitor extends Command
 
 
         //print_r($streamsharditerators);
-        print "Monitoring Stream $streamname".PHP_EOL;
+        print "Starting Steam Monitoring for the following Streams: ".PHP_EOL;
+        foreach($stream_monitor_list as $streamname => $stream){
+            print $streamname.PHP_EOL; 
+        }
+
         while(true){
             foreach($stream_monitor_list as $streamname => $stream){
                 //print $streamname.PHP_EOL;
@@ -235,12 +241,18 @@ class AgentEventMonitor extends Command
                             'secret' => $stream['app_secret'],
                         ],
                     ]);
-        
+    
 
-                    $reply = $KinesisClient->getRecords([
-                    'Limit' => 1000,
-                    'ShardIterator' => $iterator, // REQUIRED
-                    ]);
+                    try{
+                        $reply = $KinesisClient->getRecords([
+                            'Limit' => 1000,
+                            'ShardIterator' => $iterator, // REQUIRED
+                            ]);
+                    }catch(Aws\Kinesis\Exception $e){
+                        echo 'Caught exception: ',  $e->getMessage(), "\n";
+                        echo 'Cannot get shard interator. Moving on.'.PHP_EOL;
+                        continue;
+                    }
 
                     //print_r($reply);
                     
@@ -264,7 +276,7 @@ class AgentEventMonitor extends Command
                             // Agent Events Filters. 
                             $json = $record['Data']; 
                             $array = json_decode($json); 
-                            print_r($array); 
+                            //print_r($array); 
 
                             if(isset($array->CurrentAgentSnapshot)){
                                 // If this is an agent event... parse it out and present usefull data. 
@@ -322,7 +334,7 @@ class AgentEventMonitor extends Command
                                 print "$timestamp | $eventtype | $username | $oldtime | $oldstatus -> $status | $time"; 
 
 
-                                $json = json_encode($array); 
+                                //$json = json_encode($array); 
 
 
                                 $agent = Agent::updateOrCreate(
