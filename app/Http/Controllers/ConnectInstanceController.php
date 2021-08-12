@@ -18,6 +18,18 @@ class ConnectInstanceController extends Controller
         return Instance::all();
     }
 
+    public function list(Request $request)
+    {
+        
+        //Log::info("Hitting Logg");
+        $instances = Instance::all();
+        if($request->ajax()){
+        return response()->json(array('instances' => $instances));
+        }
+        
+        return view('instances', compact('instances'));
+    }
+
     /**
      * Show the form for creating a new resource.
      *

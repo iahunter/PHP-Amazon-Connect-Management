@@ -1,5 +1,5 @@
 <?php
-
+use App\Http\Controllers; 
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,5 +14,21 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
+    return redirect('admin');
     return view('welcome');
 });
+
+Route::get('/instances','App\Http\Controllers\ConnectInstanceController@list')->name('get_instances');
+
+//Route::get('/instance/{instance_id}/agents','App\Http\Controllers\AgentStatusController@show')->name('get_instance_agent_status');
+
+Route::get('/instance/{instance_id}/agents', function () {
+
+    $agents = Agent::where('instance_id', $instance_id)->get();
+
+    return view('instancewallboard', [
+        'instance_id' => $instance_id,
+        'agents' => $agents,
+    ]);
+});
+

@@ -45,9 +45,20 @@ class AgentStatusController extends Controller
      * @param  string  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request)
     {
-        return Agent::where('instance_id', $id)->get(); 
+        //Log::info("Hitting Logg");
+        return $request; 
+        $instance_id = $request->instance_id; 
+
+        $agents = Agent::where('instance_id', $instance_id)->get();
+        
+        //Log::info("Hitting Logg");
+        if($request->ajax()){
+        return response()->json(array('agents' => $agents));
+        }
+        
+        return view('instancewallboard', compact('agents'));
     }
 
     /**
