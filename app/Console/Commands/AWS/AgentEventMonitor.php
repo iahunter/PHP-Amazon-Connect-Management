@@ -8,7 +8,7 @@ use Aws\Kinesis\KinesisClient;
 use Aws\Connect\ConnectClient;
 use Aws\Exception\AwsException; 
 
-use Aws\Kinesis\Exception; 
+use Aws\Kinesis\Exception\KinesisException; 
 
 use Illuminate\Support\Facades\Crypt;
 use Carbon\Carbon;
@@ -52,6 +52,8 @@ class AgentEventMonitor extends Command
      */
     public function handle()
     {
+
+        $scriptstart = Carbon::now(); 
 
         $stream_monitor_list = []; 
 
@@ -216,7 +218,8 @@ class AgentEventMonitor extends Command
         //print_r($streamsharditerators);
         print "Starting Steam Monitoring for the following Streams: ".PHP_EOL;
         foreach($stream_monitor_list as $streamname => $stream){
-            print $streamname.PHP_EOL; 
+            $shardcount = count($stream['shards']); 
+            print "$streamname with $shardcount shards".PHP_EOL; 
         }
 
         while(true){
@@ -248,10 +251,39 @@ class AgentEventMonitor extends Command
                             'Limit' => 1000,
                             'ShardIterator' => $iterator, // REQUIRED
                             ]);
-                    }catch(Aws\Kinesis\Exception $e){
+                    }catch(KinesisException $e){
+                        print_r($shard);
+
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
-                        echo 'Cannot get shard interator. Moving on.'.PHP_EOL;
-                        continue;
+                        echo "Cannot get shard interator. Getting Latest iterator for $streamname: $shardid.".PHP_EOL;
+                        $currentIterator = $KinesisClient->getShardIterator([
+                            'ShardId' => $shardid, // REQUIRED
+                            'ShardIteratorType' => 'LATEST', // REQUIRED
+                            //'StartingSequenceNumber' => '<string>',
+                            'StreamName' => $streamname, // REQUIRED
+                            //'Timestamp' => <integer || string || DateTime>,
+                        ]);
+
+                        //print_r($currentIterator); 
+
+                        $stream_monitor_list[$streamname]['shards'][$shard['ShardId']]['ShardIterator'] = $currentIterator['ShardIterator']; 
+
+                        //echo 'Caught exception: ',  $e->getMessage(), "\n";
+                        //echo 'Cannot get shard interator. Moving on.'.PHP_EOL;
+
+                        try{
+                            $reply = $KinesisClient->getRecords([
+                                'Limit' => 1000,
+                                'ShardIterator' => $currentIterator['ShardIterator'], // REQUIRED
+                                ]);
+                            
+                            print_r($reply);
+                        }catch(KinesisException $e){
+                            echo 'Caught exception: ',  $e->getMessage(), "\n";
+                            print "Kinesis blowing up... Shard may be closed.... Moving on...".PHP_EOL;
+                            continue;
+                        }
+
                     }
 
                     //print_r($reply);
@@ -259,12 +291,15 @@ class AgentEventMonitor extends Command
                     $records = $reply['Records']; 
                     $nextiterator = $reply['NextShardIterator'];
 
-                    $stream_monitor_list[$streamname][$shardid]['ShardIterator'] = $nextiterator;
+                    
                     if(!$nextiterator){
                         print "No next iterator found... Shard may be closed.... $nextiterator".PHP_EOL;
 
                         continue;
                     }
+
+                    //$stream_monitor_list[$streamname][$shardid]['ShardIterator'] = $nextiterator;
+                    $stream_monitor_list[$streamname]['shards'][$shard['ShardId']]['ShardIterator'] = $nextiterator; 
 
                     //print_r($records);
                     
@@ -328,12 +363,17 @@ class AgentEventMonitor extends Command
                                     $oldstatus = null;
                                 }
 
-                                print_r($array); 
-                                
-                                
-                                print "$timestamp | $eventtype | $username | $oldtime | $oldstatus -> $status | $time"; 
+                                //print_r($array); 
 
+                                $short_iterator = substr($iterator, -10); 
+                                
+                                $now = Carbon::now(); 
+                                $runtime = $now->diffInSeconds($scriptstart); 
+                                
+                                print "$runtime | $shardid | $short_iterator | $timestamp | $eventtype | $username | $oldtime | $oldstatus -> $status | $time".PHP_EOL; 
 
+                                
+                                 
                                 //$json = json_encode($array); 
 
 
@@ -366,8 +406,28 @@ class AgentEventMonitor extends Command
 
             //print "No new records found... Please Wait...".PHP_EOL;
 
+            $now = Carbon::now(); 
+            $runtime = $now->diffInSeconds($scriptstart); 
+
+
+            // Logout Agents that haven't been updated in 15 mins. Heartbeats should update every 2 minutes. 
+            $agents = Agent::all(); 
+
+            foreach($agents as $agent){
+                $updated_at = $agent['updated_at'].PHP_EOL; 
+
+                if($now->diffInSeconds($updated_at) > 900){
+                    //print "Agent {$agent['username']} must be logged out... Changing Status".PHP_EOL;
+                    $agent->status = "OFFLINE";
+                    $agent->save(); 
+                    //print_r($agent);
+
+                }
+            }
+
             sleep(2);
         }
+
 
         
     }
