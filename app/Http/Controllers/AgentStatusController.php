@@ -15,7 +15,7 @@ class AgentStatusController extends Controller
      */
     public function index()
     {
-        return Agent::all(); 
+        return Agent::orderBy('username')->get(); 
     }
 
     /**

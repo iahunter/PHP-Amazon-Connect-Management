@@ -168,12 +168,13 @@ class RestoreConfigFromBackupFile extends Command
         
 
         // Jobs to restore
+        /*
         $this->restore_hours_of_operation();  // This must be done manually because the AWS API Doesn't support creating. 
         $this->restore_queues(); 
         $this->restore_contact_flow_names();
         $this->restore_contact_flow_content();
         $this->restore_routing_profiles();
-        $this->restore_users(); 
+        $this->restore_users(); */
         $this->restore_quickconnects();
         $this->restore_queue_quickconnects();
 
@@ -359,6 +360,8 @@ class RestoreConfigFromBackupFile extends Command
                         return;
     
                     }
+
+                    sleep(2);
                 }
             }
 
@@ -378,6 +381,8 @@ class RestoreConfigFromBackupFile extends Command
                         return;
     
                     }
+
+                    sleep(2);
                 }
             }
 
@@ -486,6 +491,50 @@ class RestoreConfigFromBackupFile extends Command
 
         //print_r($flows); 
 
+        // Get Users
+        try{
+            $result = $this->ConnectClient->listUsers([
+                'InstanceId' => $this->instance_id, // REQUIRED
+            ]);
+            print_r($result);
+        }catch(AwsException $e){
+            echo 'Caught exception: ',  $e->getMessage(), "\n";
+            return;
+        }
+
+        $instance_users = $result['UserSummaryList']; 
+
+        print_r($instance_users); 
+
+        $users = []; 
+        foreach($this->backup->Users as $user){
+            $user = json_decode(json_encode($user), true); 
+            //print_r($queue); 
+            if(!isset($user['Username'])){
+                continue;
+            }
+            if(!array_key_exists($user['Username'], $users)){
+                $users[$user['Username']] = []; 
+            }
+            
+            $users[$user['Username']]["source"] = $user; 
+        }
+
+        foreach($instance_users as $user){
+            if(!isset($user['Username'])){
+                continue;
+            }
+            if(!array_key_exists($user['Username'], $users)){
+                $users[$user['Username']] = []; 
+            }
+            
+            $users[$user['Username']]["destination"] = $user; 
+        }
+
+        print_r($users); 
+
+        // Get QuickConects
+
         $QuickConnects = $this->backup->QuickConnects;
 
         try{
@@ -498,7 +547,7 @@ class RestoreConfigFromBackupFile extends Command
             return;
         }
 
-        $instance_users = $result['QuickConnectSummaryList']; 
+        $instance_quickconnects = $result['QuickConnectSummaryList']; 
 
         foreach($QuickConnects as $object){
 
@@ -525,8 +574,17 @@ class RestoreConfigFromBackupFile extends Command
                 if(!isset($i['source'])){
                     continue;
                 }
-                print_r($i); 
+                //print_r($i); 
                 $newcontent = str_replace($i['source']['Arn'], $i['destination']['Arn'], $newcontent);
+                $newcontent = str_replace($i['source']['Id'], $i['destination']['Id'], $newcontent);
+            }
+
+            foreach($users as $i){
+                if(!isset($i['source'])){
+                    continue;
+                }
+                print_r($i); 
+                //$newcontent = str_replace($i['source']['Arn'], $i['destination']['Arn'], $newcontent);
                 $newcontent = str_replace($i['source']['Id'], $i['destination']['Id'], $newcontent);
             }
             print_r($object);
@@ -543,17 +601,18 @@ class RestoreConfigFromBackupFile extends Command
             
 
             // set array keys to queue name. 
-            $current_users = []; 
-            foreach($instance_users as $u){
-                $current_users[$u['Name']] = $u; 
+            $instance_qc = []; 
+            foreach($instance_quickconnects as $u){
+                $instance_qc[$u['Name']] = $u; 
             }
 
             unset($new_object['QuickConnectId']);
             unset($new_object['QuickConnectARN']);
             $new_object['InstanceId'] = $this->instance_id; 
             
+            print_r($instance_qc); 
 
-            if(!array_key_exists($new_object['Name'], $current_users)){
+            if(!array_key_exists($new_object['Name'], $instance_qc)){
 
                 //print_r($object); 
 
@@ -1162,7 +1221,7 @@ class RestoreConfigFromBackupFile extends Command
             $prompts[$prompt['Name']]["destination"] = $prompt; 
         }
 
-        print_r($prompts); 
+        //print_r($prompts); 
 
         try{
             $result = $this->ConnectClient->listHoursOfOperations([
@@ -1195,51 +1254,14 @@ class RestoreConfigFromBackupFile extends Command
             $hours[$hour['Name']]["destination"] = $hour; 
         }
 
-        print_r($hours); 
-
-
-        try{
-            $result = $this->ConnectClient->listQueues([
-                'InstanceId' => $this->instance_id, // REQUIRED
-            ]);
-            print_r($result);
-        }catch(AwsException $e){
-            echo 'Caught exception: ',  $e->getMessage(), "\n";
-            return;
-        }
-
-        $instance_queues = $result['QueueSummaryList']; 
-
-        $queues = []; 
-        foreach($this->backup->Queues as $queue){
-            $queue = json_decode(json_encode($queue), true); 
-            print_r($queue); 
-            if(!isset($queue['Name'])){
-                continue;
-            }
-            if(!array_key_exists($queue['Name'], $queues)){
-                $queues[$queue['Name']] = []; 
-            }
-            
-            $queues[$queue['Name']]["source"] = $queue; 
-        }
-
-        foreach($instance_queues as $queue){
-            if(!array_key_exists($queue['Name'], $queues)){
-                $queues[$queue['Name']] = []; 
-            }
-            
-            $queues[$queue['Name']]["destination"] = $queue; 
-        }
-
-        print_r($queues); 
+        //print_r($hours);        
         
 
         $ContactFlows = $this->backup->ContactFlows;
 
         foreach($ContactFlows as $object){
 
-            print_r($object); 
+            //print_r($object); 
 
             // Extract the variables we need to build the queue from backup. 
             $name = $object->Name; 
@@ -1249,7 +1271,7 @@ class RestoreConfigFromBackupFile extends Command
             $newcontent = ""; 
             $count = 0; 
 
-            print_r($flows); 
+            //print_r($flows); 
 
             //die();
             
@@ -1294,6 +1316,59 @@ class RestoreConfigFromBackupFile extends Command
                 $newcontent = str_replace($hour['source']['HoursOfOperationArn'], $hour['destination']['Arn'], $newcontent);
                 $newcontent = str_replace($hour['source']['HoursOfOperationId'], $hour['destination']['Id'], $newcontent);
             }
+
+            try{
+                $result = $this->ConnectClient->listQueues([
+                    'InstanceId' => $this->instance_id, // REQUIRED
+                ]);
+                print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+    
+            $instance_queues = $result['QueueSummaryList']; 
+    
+            $queues = []; 
+            foreach($this->backup->Queues as $queue){
+                $queue = json_decode(json_encode($queue), true); 
+                print_r($queue); 
+                if(!isset($queue['Name'])){
+                    continue;
+                }
+                if(!array_key_exists($queue['Name'], $queues)){
+                    $queues[$queue['Name']] = []; 
+                }
+                
+                $queues[$queue['Name']]["source"] = $queue; 
+            }
+
+            print_r($queues);
+            //print_r($instance_queues); 
+
+            // set array keys to queue name. 
+            $current_queues = []; 
+            foreach($instance_queues as $queue){
+                if(!isset($queue['Name'])){
+                    continue; 
+                }
+                $current_queues[$queue['Name']] = $queue; 
+            }
+
+            //print_r($current_queues); 
+            
+    
+            foreach($current_queues as $queue){
+                if(!array_key_exists($queue['Name'], $queues)){
+                    $queues[$queue['Name']] = []; 
+                }
+                
+                $queues[$queue['Name']]["destination"] = $queue; 
+            }
+    
+            print_r($queues); 
+
+            //die(); 
 
             // Fix Queue Info
             foreach($queues as $queue){
@@ -1361,14 +1436,20 @@ class RestoreConfigFromBackupFile extends Command
 
         $instance_queues = $result['QueueSummaryList']; 
 
+        print_r($instance_queues); 
+
+        
+
         // set array keys to queue name. 
         $current_queues = []; 
         foreach($instance_queues as $queue){
-            if(!isset($array['Name'])){
+            if(!isset($queue['Name'])){
                 continue; 
             }
             $current_queues[$queue['Name']] = $queue; 
         }
+
+        print_r($current_queues); 
 
         $Queues = $this->backup->Queues;
 
@@ -1390,7 +1471,7 @@ class RestoreConfigFromBackupFile extends Command
                 $result = $this->ConnectClient->listHoursOfOperations([
                     'InstanceId' => $this->instance_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(AwsException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 return;
@@ -1421,18 +1502,49 @@ class RestoreConfigFromBackupFile extends Command
                 //'Tags' => ['<string>'],
             ]; 
 
-            if(isset($object->OutboundCallerConfig)){
-                $callerid_name = $object->OutboundCallerConfig->OutboundCallerIdName; 
+            $object = json_decode(json_encode($object), true); 
+
+            if(isset($object['OutboundCallerConfig'])){
+                print_r($object); 
+
+                if(isset($object['OutboundCallerConfig']['OutboundCallerIdName'])){
+                    $callerid_name = $object['OutboundCallerConfig']['OutboundCallerIdName']; 
+                }else{
+                    $callerid_name = " "; 
+                }   
+
                 $queue['OutboundCallerConfig'] = [
                     'OutboundCallerIdName' => $callerid_name,
                     //'OutboundCallerIdNumberId' => '<string>',
                     //'OutboundFlowId' => '<string>',
                 ];
+                
             }
+
+            /*
+            if(isset($object->OutboundCallerConfig)){
+                print_r($object); 
+                $callerid_name = $object->OutboundCallerConfig->OutboundCallerIdName; 
+
+                if(!isset($object->OutboundCallerConfig->OutboundCallerIdName)){
+                    $callerid_name = " "; 
+                }   
+
+                $queue['OutboundCallerConfig'] = [
+                    'OutboundCallerIdName' => $callerid_name,
+                    //'OutboundCallerIdNumberId' => '<string>',
+                    //'OutboundFlowId' => '<string>',
+                ];
+                
+            }
+            */
+
+            print $name.PHP_EOL; 
+            print_r($current_queues); 
 
             if(!array_key_exists($name, $current_queues)){
 
-                print_r($array); 
+                //print_r($array); 
 
                 $this->manual[] = $array; 
 
@@ -1452,9 +1564,9 @@ class RestoreConfigFromBackupFile extends Command
                 
                 /* TODO - ADD Overwrite functionality */
             }
-        }
 
-        return;
+            sleep(1); 
+        }
     }
 
 

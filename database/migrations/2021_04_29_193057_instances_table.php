@@ -24,6 +24,7 @@ class InstancesTable extends Migration
             $table->string('region')->index()->nullable();
             $table->json('flows')->nullable();                       // JSON Custom Field Data
             $table->json('storage')->nullable();                       // JSON Custom Field Data
+            $table->boolean('monitoring')->nullable();                       // JSON Custom Field Data
             $table->json('json')->nullable();                       // JSON Custom Field Data
             $table->json('build_data')->nullable();                       // JSON Custom Field Data
 			$table->timestamps();                       // Time Stamps
