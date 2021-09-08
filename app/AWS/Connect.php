@@ -131,6 +131,38 @@ class Connect
         return $custom_flows;
     }
 
+    public function backupAgentStatus($instance){
+        // Get Custom Flows and Store in the Database
+        $statuses = $this->ConnectClient->listAgentStatuses([
+            'InstanceId' => $instance['Id'],
+            //'AgentStatusTypes' => ['ROUTABLE','CUSTOM','OFFLINE'],
+        ]);
+
+        $statuslist = [];
+
+        if(isset($statuses['AgentStatusSummaryList']) && count($statuses['AgentStatusSummaryList'])){
+            foreach($statuses['AgentStatusSummaryList'] as $status){
+                // Need to possibly queue these jobs in case they error out. 
+                try{
+                    $getresult = $this->ConnectClient->describeAgentStatus([
+                        'AgentStatusId' => $status['Id'],
+                        'InstanceId' => $instance['Id'],
+                    ]);
+                }catch(AwsException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    continue;
+                }
+                
+                
+                //print_r($getresult);
+                $statuslist[] = $getresult['AgentStatus'];
+
+                sleep(1);
+            }
+        }
+
+        return $statuslist;
+    }
 
     public function backupUsers($instance){
         // Get Custom Flows and Store in the Database

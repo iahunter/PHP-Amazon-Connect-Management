@@ -14,26 +14,26 @@ use Illuminate\Support\Facades\Crypt;
 use Carbon\Carbon;
 
 use App\AWS\Connect;
+use App\Models\AmazonConnect\Ctr;
 
-use App\Models\AmazonConnect\Agent;
 use App\Models\Company;
 use App\Models\Account;
 
-class AgentEventMonitor extends Command
+class CtrEventMonitor Extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'aws:agentevents';
+    protected $signature = 'aws:ctrevents';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Subscribes to all instance Agent Streams and Updates Database with agent status';
+    protected $description = 'Subscribes to all Instance CTR Streams and Prints to the Console';
 
     /**
      * Create a new command instance.
@@ -52,7 +52,6 @@ class AgentEventMonitor extends Command
      */
     public function handle()
     {
-
         $scriptstart = Carbon::now(); 
 
         $stream_monitor_list = []; 
@@ -123,7 +122,7 @@ class AgentEventMonitor extends Command
 
                     $getresult = $client->listInstanceStorageConfigs([
                         'InstanceId' => $instance['Id'],
-                        'ResourceType' => 'AGENT_EVENTS',
+                        'ResourceType' => 'CONTACT_TRACE_RECORDS',
                     ]);
 
                     
@@ -154,16 +153,23 @@ class AgentEventMonitor extends Command
                         $instances[$instance['Id']] = null;
                     }
 
+                    //die(); 
+
+
+                    
                 }
 
                 
 
                 $instance_data[$number]['regions'][$region] = $instances;
+
+                //print_r($stream_monitor_list);
+                
             }
         
         }
 
-        print_r($stream_monitor_list);
+        //print_r($stream_monitor_list);
 
        
         /*************************************************** */
@@ -205,7 +211,7 @@ class AgentEventMonitor extends Command
             //$stream_monitor_list[$streamname]['shards'] = $shards['Shards'];
         }
 
-        print_r($stream_monitor_list);
+        //print_r($stream_monitor_list);
 
 
         //print_r($streamsharditerators);
@@ -298,96 +304,37 @@ class AgentEventMonitor extends Command
                     
                     if(!empty($records)){
                         foreach($records as $record){
-                            //print "Printing Record from Stream $streamname".PHP_EOL;
-                            //print_r($record);
-
-                            // Agent Events Filters. 
-                            $json = $record['Data']; 
-                            $array = json_decode($json); 
-                            //print_r($array); 
-
-                            if(isset($array->CurrentAgentSnapshot)){
-                                // If this is an agent event... parse it out and present usefull data. 
-                                $timestamp = $array->EventTimestamp; 
-                                $eventtype = $array->EventType; 
-
-                                if($eventtype != "STATE_CHANGE" &&  $eventtype != "LOGIN"){
-                                    //continue;
-                                }
-
-                                $username = $array->CurrentAgentSnapshot->Configuration->Username; 
+                            $data = $record['Data']; 
+                            if(json_decode($data, true)){
+                                $array = json_decode($data, true);
                                 
-                                $time = $array->CurrentAgentSnapshot->AgentStatus->StartTimestamp;
-                                $status = $array->CurrentAgentSnapshot->AgentStatus->Name;
+                                //print_r($array);
+                                $insert = Ctr::format_record($array);
+                                //print_r($insert);
 
-                                $newstatus = null; 
-                                if(!empty($array->CurrentAgentSnapshot->Contacts)){
-                                    $status = $array->CurrentAgentSnapshot->Contacts; 
-                                    foreach($status as $stat){
-                                        if($stat->Channel == "VOICE"){
-                                            $newstatus = $stat->State; 
-                                        }
-                                    }
-                                }
-                                
-                                if($newstatus){
-                                    $status = $newstatus; 
-                                }
-
-                                $status = strtoupper($status); 
-
-                                $contacts = $array->CurrentAgentSnapshot->Contacts;
-
-                                $instance_arn = $array->InstanceARN; 
-
-                                $instance_array = explode("/", $instance_arn); 
-
-                                //print_r($instance_array[1]); 
-
-                                //die(); 
-
-                                $instance_id = $instance_array[1];
-
-                                if(isset($array->PreviousAgentSnapshot)){
-                                    $oldtime = $array->PreviousAgentSnapshot->AgentStatus->StartTimestamp;
-                                    $oldstatus = $array->PreviousAgentSnapshot->AgentStatus->Name;
-                                }else{
-                                    $oldtime = null;
-                                    $oldstatus = null;
-                                }
-
-                                //print_r($array); 
-
-                                $short_iterator = substr($iterator, -10); 
-                                
-                                $now = Carbon::now(); 
-                                $runtime = $now->diffInSeconds($scriptstart); 
-                                
-                                print "$runtime | $shardid | $short_iterator | $timestamp | $eventtype | $username | $oldtime | $oldstatus -> $status | $time".PHP_EOL; 
-
-                                
-                                 
-                                //$json = json_encode($array); 
-
-
-                                $agent = Agent::updateOrCreate(
-                                                // Search
-                                                [   'arn' => $array->AgentARN, 
-                                                    'instance_id' => $instance_id
-                                                ],
-                                                // Update or Create merged with Search
-                                                [   'username' => $username, 
-                                                    'status' => $status,
-                                                    'json' => $json
-                                                ]
-                                ); 
+                                print "{$insert['instance_id']} | {$insert['start_time']} | {$insert['disconnect_time']} | {$insert['customer_endpoint']} | {$insert['system_endpoint']} | {$insert['queue']} | {$insert['queue_duration']} | {$insert['agent']} | {$insert['connect_to_agent_time']} | {$insert['disconnect_reason']}".PHP_EOL; 
 
                                 //die();
-
-                                //print_r($contacts); 
-                            }else{
-                                print_r($array);
                             }
+                            else{
+                                // If files has multiple records we need to parse them because they can't be decoded by json decoder
+                                $array = [];
+                                $fixstupidcrap = str_replace("}{", "}&&{", $data); 
+                                $stupid = explode("&&", $fixstupidcrap);
+                                //print_r($stupid);
+            
+                                foreach($stupid as $object){
+                                    $json = json_decode($object, true);
+                                    $insert = Ctr::format_record($json);
+                                    //print_r($insert);
+
+                                    print "{$insert['instance_id']} | {$insert['start_time']} | {$insert['disconnect_time']} | {$insert['customer_endpoint']} | {$insert['system_endpoint']} | {$insert['queue']} | {$insert['queue_duration']} | {$insert['agent']} | {$insert['connect_to_agent_time']} | {$insert['disconnect_reason']}".PHP_EOL; 
+
+                                }
+                            }
+
+
+
                             
                         }
                     }else{
@@ -402,30 +349,11 @@ class AgentEventMonitor extends Command
             $now = Carbon::now(); 
             $runtime = $now->diffInSeconds($scriptstart); 
 
-
-            // Logout Agents that haven't been updated in 15 mins. Heartbeats should update every 2 minutes. 
-            $agents = Agent::all(); 
-
-            foreach($agents as $agent){
-                $updated_at = $agent['updated_at'].PHP_EOL; 
-
-                if($now->diffInSeconds($updated_at) > 900){
-                    //print "Agent {$agent['username']} must be logged out... Changing Status".PHP_EOL;
-                    $agent->status = "OFFLINE";
-                    $agent->save(); 
-                    //print_r($agent);
-
-                }
-            }
-
             sleep(2);
-
-            // Restart the monitor every hour so we can fetch newly created instances. 
-            if($runtime > 3600){
-                return; 
-            }
         }
 
+
+        
     }
 
     public function KinesisClient($region)
@@ -441,6 +369,5 @@ class AgentEventMonitor extends Command
 
         return $client;
     }
-
 
 }

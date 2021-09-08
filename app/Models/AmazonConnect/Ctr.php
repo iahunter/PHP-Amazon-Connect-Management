@@ -5,6 +5,8 @@ namespace App\Models\AmazonConnect;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Support\Facades\DB;
+
 use Carbon\Carbon;
 
 class Ctr extends Model
@@ -138,11 +140,17 @@ class Ctr extends Model
 
     public static function format_record($array){
 
+                //print_r($array); 
                 $insert['contact_id'] = $array['ContactId'];
 
-                $insert['instance_id'] = $array['InstanceARN']; 
+                $id = explode("/", $array['InstanceARN']);
 
-                $insert['s3_key'] = $array['S3_Key']; 
+                $insert['instance_id'] = $id[1]; 
+
+                if(isset($array['S3_Key'])){
+                    $insert['s3_key'] = $array['S3_Key']; 
+                }
+                
 
 				//print $insert['s3_key'].PHP_EOL;
 
@@ -198,16 +206,22 @@ class Ctr extends Model
 				
 				if(isset($array['InitiationTimestamp'])){
 					//$insert['start_time'] = $array['InitiationTimestamp'];
-                    $insert['start_time'] = Carbon::parse($array['InitiationTimestamp']);
+                    $starttime = Carbon::parse($array['InitiationTimestamp']);
+                    $insert['start_time'] = $starttime; 
 				}else{
 					$insert['start_time'] = null;
 				}
 				if(isset($array['DisconnectTimestamp'])){
 					//$insert['disconnect_time'] = $array['DisconnectTimestamp'];
-                    $insert['disconnect_time'] = Carbon::parse($array['DisconnectTimestamp']);
+                    $endtime = Carbon::parse($array['DisconnectTimestamp']);
+                    $insert['disconnect_time'] = $endtime;
+
+                    $insert['contact_duration'] = $endtime->diffInSeconds($starttime); 
 				}else{
 					$insert['disconnect_time'] = null;
 				}
+
+
 
 				if(isset($array['DisconnectReason'])){
 					$insert['disconnect_reason'] = $array['DisconnectReason'];
@@ -238,5 +252,360 @@ class Ctr extends Model
                 return $insert;
     }
 
+    public static function get_last_record_from_bucket($bucket_name){
+        // Used to get a starting S3 key to start from when fetching new records from S3. 
+        $regex = '^s3:\/\/'.$bucket_name.'.*'; 
+
+        $calls = self::where('s3_key', 'regexp', $regex)->latest('start_time')->first();
+
+        $recordkey = $calls['s3_key']; 
+
+        $array = explode("s3://{$bucket_name}/", $recordkey); 
+
+        return $array[1];
+
+    }
+
+    public static function years_call_summary($instance_id){
+
+        $start = Carbon::now()->startOfYear()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($todays_calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+    public static function months_call_summary($instance_id){
+
+        $start = Carbon::now()->startOfMonth()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($todays_calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+    public static function months_daily_call_summary($instance_id){
+
+
+        $start = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+    public static function weeks_call_summary($instance_id){
+
+
+        $start = Carbon::now()->startOfWeek()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+    public static function yesterday_call_summary($instance_id){
+
+
+        $start = Carbon::yesterday()->startOfDay()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->startOfDay()->shiftTimezone(env("TIMEZONE"));
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+
+    public static function todays_call_summary($instance_id){
+
+        $start = Carbon::now()->startOfDay()->shiftTimezone(env("TIMEZONE"));
+        //print $start.PHP_EOL;
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+        //print $now.PHP_EOL;
+
+        
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+        /*
+        $start = Carbon::yesterday()->startOfDay();
+        //print $start.PHP_EOL;
+        $now = Carbon::now()->startOfDay();
+        //print $now.PHP_EOL;
+        */
+
+
+        //print_r(self::whereBetween('start_time', [$start, $now])->get()); 
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
+            //print_r($todays_calls); 
+        }else{
+            $calls = []; 
+        }
+
+        if(empty($calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($calls); 
+        
+    }
+
+    public static function todays_call_summary_by_queue($instance_id, $queue){
+
+        $start = Carbon::now()->startOfDay()->shiftTimezone(env("TIMEZONE"));
+        //print $start.PHP_EOL;
+        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));  
+        //print $now.PHP_EOL;
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+        /*
+        $start = Carbon::yesterday()->startOfDay();
+        //print $start.PHP_EOL;
+        $now = Carbon::now()->startOfDay();
+        //print $now.PHP_EOL;
+        */
+
+
+        //print_r(self::whereBetween('start_time', [$start, $now])->get()); 
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->where('queue', $queue)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $todays_calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->where('queue', $queue)->get(); 
+            //print_r($todays_calls); 
+        }else{
+            $todays_calls = []; 
+        }
+
+        if(empty($todays_calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($todays_calls); 
+        
+    }
+
+    public static function yesterday_call_summary_by_queue($instance_id, $queue){
+
+        $start = Carbon::yesterday()->startOfDay()->shiftTimezone(env("TIMEZONE"));
+        $now = Carbon::now()->startOfDay()->shiftTimezone(env("TIMEZONE")); 
+
+        $start = $start->timezone("UTC"); 
+        $now = $now->timezone("UTC"); 
+
+        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->where('queue', $queue)->count())
+        {
+            //print "Get calls...".PHP_EOL;
+            $todays_calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->where('queue', $queue)->get();
+            
+        }else{
+            $todays_calls = []; 
+        }
+
+        if(empty($todays_calls)){
+            return []; 
+        }
+        
+        return self::call_summary_report($todays_calls); 
+        
+    }
+
+    
+
+    public static function call_summary_report($calls){
+        
+        $time = 0; 
+        $callkeys = []; 
+        $callsummary = [];
+        $callcount = 0; 
+        $callsummary['abandons'] = [];
+        $callsummary['inbound'] = [];  
+        $callsummary['callbacks'] = [];  
+        $callsummary['other_prob_callback'] = [];  
+        $callsummary['outbound'] = [];  
+        $callsummary['inboundtimeouts'] = [];  
+        $callsummary['transfer'] = [];  
+        $callsummary['inboundhangups'] = [];  
+
+        foreach($calls as $key => $call){
+            $call = json_decode(json_encode($call), true); 
+            $callkeys[$call['contact_id']] = $call; 
+        }
+
+        //print_r($callkeys); 
+
+        
+
+        foreach($callkeys as $call){
+            $callcount ++; 
+            $callduration = $call['contact_duration']; 
+
+            if($callduration == 0){
+                // Ignore records if no call duration. 
+                continue; 
+            }
+
+            if($callduration < 60){
+                $callduration = 60; 
+            }
+
+            $time = $time + $callduration; 
+
+            if($call['queue'] && $call['queue_duration'] > 0){
+                if(!$call['connect_to_agent_time'] && !$call['next_contact_id']){
+                    $callsummary['abandons'][] = $call;
+                    continue;  
+                }
+                if($call['initiation_method'] == "INBOUND" && $call['connect_to_agent_time']){
+                    $callsummary['inbound'][] = $call; 
+                    continue; 
+                }
+                if($call['initiation_method'] == "CALLBACK"){
+                    $callsummary['callbacks'][] = $call; 
+                    continue; 
+                }
+                if(!$call['connect_to_agent_time'] && $call['next_contact_id']){
+                    $callsummary['other_prob_callback'][] = $call; 
+                    continue; 
+                }
+                //print_r($call); 
+            }
+            elseif($call['initiation_method'] == "OUTBOUND"){
+                $callsummary['outbound'][] = $call; 
+                continue; 
+            }
+            elseif($call['disconnect_reason'] == "CONTACT_FLOW_DISCONNECT"){
+                $callsummary['inboundtimeouts'][] = $call;
+                continue; 
+            }
+            else{
+                //$inboundhangups[] = $call;
+                $json = json_decode($call['cdr_json'], true); 
+                if($json['TransferredToEndpoint']){
+                    $callsummary['transfer'][] = $call; 
+                    continue; 
+                }
+                if($json['DisconnectReason'] == "CUSTOMER_DISCONNECT"){
+                    $callsummary['inboundhangups'][] = $call; 
+                    continue; 
+                }
+                //print_r($json); 
+            }
+        }
+
+        //print_r($callsummary).PHP_EOL;
+
+        $report = []; 
+        foreach($callsummary as $key => $value){
+            //print $key.": ". count($value).PHP_EOL;
+            $report[$key] = count($value);
+        }
+
+        $report['seconds'] = $time; 
+
+        $minutes = $time / 60;
+        $report['minutes'] = $minutes; 
+        //print $minutes.PHP_EOL; 
+        $cost_per_minute = .018 + .015 + 0.0022; // Connect Cost per min + Contact Lens per min+ Telecom DID per min. .0352 per min
+        $usage_cost = $minutes * $cost_per_minute;
+        //print $callcount; 
+        //$transaction_cost = $callcount * .025; 
+        $report['totalcalls'] = $callcount; 
+        $report['cost'] = $usage_cost; 
+
+        //$report['report'] = $callsummary; 
+
+        //print_r($report); 
+
+        return $report; 
+    }
 
 }

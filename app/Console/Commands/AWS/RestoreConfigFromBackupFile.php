@@ -168,13 +168,13 @@ class RestoreConfigFromBackupFile extends Command
         
 
         // Jobs to restore
-        /*
+        
         $this->restore_hours_of_operation();  // This must be done manually because the AWS API Doesn't support creating. 
         $this->restore_queues(); 
         $this->restore_contact_flow_names();
         $this->restore_contact_flow_content();
         $this->restore_routing_profiles();
-        $this->restore_users(); */
+        $this->restore_users(); 
         $this->restore_quickconnects();
         $this->restore_queue_quickconnects();
 

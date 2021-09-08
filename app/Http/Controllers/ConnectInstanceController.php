@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AmazonConnect\Instance;
 
+use Illuminate\Support\Facades\Cache;
+
 use Illuminate\Http\Request;
 
 class ConnectInstanceController extends Controller
@@ -60,6 +62,18 @@ class ConnectInstanceController extends Controller
     public function show($id)
     {
         //
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function showInstanceQueueStats($id)
+    {
+        $instance = Cache::get($id);
+        return response()->json($instance);
     }
 
     /**

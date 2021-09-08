@@ -46,7 +46,8 @@ Vagrant.configure("2") do |config|
   
   ###########################################################
   # CHANGE TO YOUR LOCAL FILE PATH FOR YOUR VAGRANT PROJECT
-  config.vm.synced_folder "c:/DevProjects/php-amazon-connect-management", "/opt/php-amazon-connect-management"
+  #config.vm.synced_folder "c:/DevProjects/php-amazon-connect-management", "/opt/php-amazon-connect-management"
+  config.vm.synced_folder ".", "/opt/php-amazon-connect-management"
   ###########################################################
 
   # Provider-specific configuration so you can fine-tune various
@@ -71,4 +72,7 @@ Vagrant.configure("2") do |config|
   #   apt-get update
   #   apt-get install -y apache2
   # SHELL
-end
+  config.vm.provision "shell", run: "always",
+	inline: "systemctl restart nginx amazon-connect-queue.service amazon-connect-agent.service"
+
+  end

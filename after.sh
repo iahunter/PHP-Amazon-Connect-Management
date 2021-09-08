@@ -117,4 +117,10 @@ fi
 
 apt install subversion
 
+# Install Redis 
+apt install redis-server
+
+sed -i 's/supervised no/supervised systemd/' /etc/redis/redis.conf
+
+systemctl restart redis.service
 

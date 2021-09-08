@@ -10,20 +10,27 @@ use Aws\Exception\AwsException;
 
 use Illuminate\Database\QueryException; 
 
+
+use Illuminate\Support\Facades\Crypt;
 use Carbon\Carbon;
+
 use App\Models\AmazonConnect\Ctr;
 use Illuminate\Support\Facades\DB;
 
+use App\Models\Company;
+use App\Models\Account;
+use App\Models\CtrBuckets;
+
 use Illuminate\Console\Command;
 
-class GetNewConnectCtrFromS3 extends Command
+class GetCtrRecordsFromS3 extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'aws:get-ctr-records-from-s3';
+    protected $signature = 'aws:get-ctr-records-from-s3-v2';
 
     /**
      * The console command description.
@@ -49,44 +56,72 @@ class GetNewConnectCtrFromS3 extends Command
      */
     public function handle()
     {
-        $s3Client = new S3Client([
-			//'profile' => 'default',
-			'region' => env('AMAZON_REGION'),
-			'version' => '2006-03-01',
-			'credentials' => [
-				'key'    => env('AMAZON_KEY'),
-				'secret' => env('AMAZON_SECRET'),
-			],
-		]);
-		
-		//$buckets = $s3Client->listBuckets();
-		
-		//print_r($buckets->get('Buckets'));
-		
-		
-		//foreach ($buckets['Buckets'] as $bucket) {
-			//echo $bucket['Name'] . "\n";
-		
-		
 
+		$buckets = CtrBuckets::all(); 
+
+		foreach($buckets as $bucketobject){
+
+
+			print_r($bucketobject); 
+
+			$account = Account::where('account_number', $bucketobject->account_id)->first(); 
+
+			if($account->account_app_key){
+				$this->app_key = Crypt::decryptString($account->account_app_key);
+			}else{
+				$this->app_key = env('AMAZON_KEY'); 
+			}
+			if($account->account_app_secret){
+				$this->app_secret = Crypt::decryptString($account->account_app_secret);
+			}else{
+				$this->app_secret = env('AMAZON_SECRET'); 
+			}
+
+			print $this->app_key.PHP_EOL; 
+			print $this->app_secret.PHP_EOL; 
+
+			$bucket = $bucketobject->name; 
 			
 
-			$bucket = env('AMAZON_BUCKET');
+			$s3Client = new S3Client([
+				'version'     => 'latest',
+				'region'      => $bucketobject->region,
+				'credentials' => [
+					'key'    => $this->app_key,
+					'secret' => $this->app_secret,
+				],
+			]);
 
+			$lastest = Ctr::get_last_record_from_bucket($bucket); 
+
+			/*
 			$objects = $s3Client->getIterator('ListObjects', array(
 				"Bucket" => $bucket,
 				"Prefix" => 'ctr-' //must have the trailing forward slash "/"
 			));
+			
+			*/ 
+			// Trying to speed this up by getting records only after the last record in our DB. 
+			$objects = $s3Client->listObjectsV2([
+				'Bucket' => $bucket,
+				'Prefix' => 'ctr-', //must have the trailing forward slash "/"
+				'StartAfter' => $lastest,
+			]);
+
 
 			$now = Carbon::now();
 			$cutoff = Carbon::now()->subDays(60);
 
-			
-
 			//print_r($objects);
+
+			//die(); 
+			
 			$key_array = []; 
 			$inserts = []; 
-			foreach ($objects as $object) {
+			foreach ($objects['Contents'] as $object) {
+				//print_r($object); 
+
+				//die(); 
 				$file_date = $object['LastModified']; 
 				$date = Carbon::parse($file_date); 
 				$date = $date->toDateTimeString(); 
@@ -111,7 +146,7 @@ class GetNewConnectCtrFromS3 extends Command
 
 			if(empty($key_array)){
 				print "Nothing to insert after $cutoff. Ending Script...".PHP_EOL;
-				return;
+				continue;
 			}
 
 			foreach ($key_array as $key) {
@@ -216,6 +251,6 @@ class GetNewConnectCtrFromS3 extends Command
 					continue; 
 				};
 			}
-
+		}
 	}
 }

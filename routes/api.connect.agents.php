@@ -17,6 +17,7 @@ use App\Http\Controllers\AgentStatusController;
  *   },
  * )
  **/
+Route::apiResource('agents', AgentStatusController::class);
 
 /**
  * @OA\Get(
@@ -43,6 +44,6 @@ use App\Http\Controllers\AgentStatusController;
  *   },
  * )
  **/
+Route::get('/agents/{id}', [AgentStatusController::class, 'show'])->name('agentstatusreport.show');
 
-Route::apiResource('agents', AgentStatusController::class);
 

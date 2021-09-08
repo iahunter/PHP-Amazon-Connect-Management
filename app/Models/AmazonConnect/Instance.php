@@ -18,6 +18,7 @@ class Instance extends Model
 		'region',
 		'flows',
 		'storage',
+		'monitoring',
 		'json',
 		'build_data'
 	];

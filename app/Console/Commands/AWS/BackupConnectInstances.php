@@ -143,6 +143,7 @@ class BackupConnectInstances extends Command
                     $prompts = $ConnectInstance->backupPrompts($instance);
                     $flows = $ConnectInstance->backupContactFlows($instance);
                     $users = $ConnectInstance->backupUsers($instance);
+                    $statuses = $ConnectInstance->backupAgentStatus($instance);
                     $uhgs = $ConnectInstance->backupUserHierarchyGroups($instance);
                     $structure = $ConnectInstance->backupUserHierarchyStructure($instance);
                     $routingProfiles = $ConnectInstance->backupRoutingProfiles($instance);
@@ -157,6 +158,7 @@ class BackupConnectInstances extends Command
                     $backup['PhoneNumbers'] = $numbers;
                     $backup['Prompts'] = $prompts;
                     $backup['ContactFlows'] = $flows;
+                    $backup['AgentStatus'] = $statuses;
                     $backup['Users'] = $users;
                     $backup['UserHierarchyGroups'] = $uhgs;
                     $backup['UserHierarchyStructure'] = $structure;
@@ -166,7 +168,7 @@ class BackupConnectInstances extends Command
                     $backup['HoursOfOperations'] = $hours;
                     $backup['QuickConnects'] = $quickConnects;
 
-                    print_r($backup);
+                    //print_r($backup);
 
                     $json = json_encode($backup, JSON_PRETTY_PRINT); 
                     //print_r($json); 
