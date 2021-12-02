@@ -81,6 +81,9 @@ apt install awscli
 # Install Subversion
 apt install subversion
 
+# Install Adminer
+apt install adminer
+
 # Create the DATABASE
 DBNAME="acm"
 echo "Adding mysql database $DBNAME"
@@ -123,4 +126,7 @@ apt install redis-server
 sed -i 's/supervised no/supervised systemd/' /etc/redis/redis.conf
 
 systemctl restart redis.service
+
+
+
 

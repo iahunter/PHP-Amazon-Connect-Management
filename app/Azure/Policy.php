@@ -6,8 +6,50 @@ class Policy
 {
     public function __construct()
     {
+        $command = "az login"; 
+        $output = shell_exec($command);
     }
 
+
+    public function getGroupMembers($group){
+
+
+    }
+
+
+
+
+
+/*
+    public function createClaimsPolicy($array, $name)
+    {
+
+    $definition = [
+        "ClaimsMappingPolicy" => [
+            "Version"               => 1,
+            "IncludeBasicClaimSet"  => "true",
+            "ClaimsSchema"          => $array,
+            "displayName"           => $name,
+            "isOrganizationDefault" => false,
+        ]
+    ]
+
+    $headers = [
+        'content-type' => 'claimsMappingPolicies/json',
+    ];
+    
+    $command = 'az rest'
+    . ' --method post '
+    . ' --headers \''.json_encode($headers).'\''
+    . ' --uri "https://graph.microsoft.com/v1.0/policies/claimsMappingPolicies'.'"'
+    . ' --body \''.json_encode($array).'\'';
+    
+    print $command;
+    
+    $output = shell_exec($command);
+
+    return $output;
+    }
 
     public function createClaimsPolicy($array, $name)
     {
@@ -41,7 +83,7 @@ class Policy
 
 
 
-/* Putting crap code from Azure CLI integration that never got working.... couldn't get claims to work. 
+ Putting crap code from Azure CLI integration that never got working.... couldn't get claims to work. 
     
         // Testing Azure CLI  
 

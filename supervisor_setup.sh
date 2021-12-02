@@ -38,6 +38,27 @@ sleep 2
 printf "Creating Symlink to config file...\n"
 ln -s $_mydir/etc/supervisor/conf.d/amazon-connect-agent-monitor.conf /etc/supervisor/conf.d/amazon-connect-agent-monitor.conf
 
+# Create new file with the working directory.
+
+printf "Generating Configuration File...\n"
+echo "
+[program:amazon-connect-queue-monitor]
+process_name=%(program_name)s_%(process_num)02d
+
+command=php $_mydir/artisan aws:get-metric-data
+autostart=true
+autorestart=true
+
+numprocs=1
+redirect_stderr=true
+stdout_logfile=$_mydir/storage/logs/metricworker.log" > $_mydir/etc/supervisor/conf.d/amazon-connect-queue-monitor.conf
+
+
+sleep 2
+# Creater Symlink to the Supervisor directory in /etc.
+printf "Creating Symlink to config file...\n"
+ln -s $_mydir/etc/supervisor/conf.d/amazon-connect-queue-monitor.conf /etc/supervisor/conf.d/amazon-connect-queue-monitor.conf
+
 sleep 2
 printf "Readin Supervisor Worker Config...\n"
 sudo supervisorctl reread

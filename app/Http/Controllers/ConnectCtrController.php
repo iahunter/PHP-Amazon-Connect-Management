@@ -72,9 +72,28 @@ class ConnectCtrController extends Controller
 		//return DeviceCollection::collection($objects);
     }
 
+    
     public function monthsCallSummary(Request $request, $instance)
     {
         $report = Ctr::months_call_summary($instance); 
+
+        $response = [
+            'status_code'       => 200,
+            'success'           => true,
+            'message'           => '',
+            'request'           => $request->all(),
+            'result'            => $report,
+        ];
+
+        return response()->json($response);
+
+		//return DeviceCollection::collection($objects);
+    }
+    
+
+    public function monthsDailyCallSummary(Request $request, $instance)
+    {
+        $report = Ctr::months_daily_call_summary($instance); 
 
         $response = [
             'status_code'       => 200,

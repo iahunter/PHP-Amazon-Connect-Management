@@ -258,6 +258,9 @@ class Ctr extends Model
 
         $calls = self::where('s3_key', 'regexp', $regex)->latest('start_time')->first();
 
+        if(!$calls){
+            return null; 
+        }
         $recordkey = $calls['s3_key']; 
 
         $array = explode("s3://{$bucket_name}/", $recordkey); 
@@ -319,29 +322,41 @@ class Ctr extends Model
 
     public static function months_daily_call_summary($instance_id){
 
+        $dates = collect();
 
-        $start = Carbon::now()->shiftTimezone(env("TIMEZONE"));
-        $now = Carbon::now()->shiftTimezone(env("TIMEZONE"));
+        $dates = []; 
 
-        $start = $start->timezone("UTC"); 
-        $now = $now->timezone("UTC"); 
+        foreach( range( -30, 0 ) AS $i ) {
+            $date = Carbon::now()->addDays( $i )->format( 'Y-m-d' );
 
+            $start = Carbon::now()->addDays( $i )->startOfDay()->shiftTimezone(env("TIMEZONE"));
+            $end = Carbon::now()->addDays( $i + 1 )->startOfDay()->shiftTimezone(env("TIMEZONE"));
 
-        if (self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->count())
-        {
-            //print "Get calls...".PHP_EOL;
-            $calls = self::whereBetween('start_time', [$start, $now])->where('instance_id', $instance_id)->get(); 
-            //print_r($calls); 
-        }else{
-            $calls = []; 
+            $start = $start->timezone("UTC"); 
+            $end = $end->timezone("UTC"); 
+
+            if (self::whereBetween('start_time', [$start, $end])->where('instance_id', $instance_id)->count())
+            {
+                //print "Get calls...".PHP_EOL;
+                $calls = self::whereBetween('start_time', [$start, $end])->where('instance_id', $instance_id)->get(); 
+                //print_r($todays_calls); 
+            }else{
+                $calls = []; 
+            }
+
+            $report = self::call_summary_report($calls); 
+
+            //return $report; 
+
+            //$dates->put( $date, $report);
+            $report['date'] = $date; 
+
+            $dates[] = $report; 
         }
 
-        if(empty($calls)){
-            return []; 
-        }
-        
-        return self::call_summary_report($calls); 
-        
+        //print_r($dates); 
+
+        return $dates; 
     }
 
     public static function weeks_call_summary($instance_id){
@@ -468,6 +483,11 @@ class Ctr extends Model
         if(empty($todays_calls)){
             return []; 
         }
+
+        $agent_calls = []; 
+        foreach($todays_calls as $call){
+
+        }
         
         return self::call_summary_report($todays_calls); 
         
@@ -494,15 +514,22 @@ class Ctr extends Model
             return []; 
         }
         
-        return self::call_summary_report($todays_calls); 
+        //return self::call_summary_report($todays_calls); 
+
+        $callsummary = self::call_summary_report($todays_calls); 
+
+        return $callsummary; 
+        
         
     }
 
     
 
-    public static function call_summary_report($calls){
+    public static function get_call_types($calls){
         
         $time = 0; 
+        $agenttime = 0;
+        $transfertime = 0;
         $callkeys = []; 
         $callsummary = [];
         $callcount = 0; 
@@ -514,30 +541,107 @@ class Ctr extends Model
         $callsummary['inboundtimeouts'] = [];  
         $callsummary['transfer'] = [];  
         $callsummary['inboundhangups'] = [];  
-
+        
         foreach($calls as $key => $call){
-            $call = json_decode(json_encode($call), true); 
+            $call = json_decode(json_encode($call), true);
             $callkeys[$call['contact_id']] = $call; 
         }
+        
+        // Review CallBacks to get associated call records. 
+        $callback_review = []; 
+        foreach($callkeys as $key => $call){
+            $call = json_decode(json_encode($call), true);
+            $call = json_decode($call['cdr_json'], true); 
+            if($call['InitialContactId'] != null){
+                if(isset($callback_review[$call['InitialContactId']])){
+                    continue; 
+                }
+                $initialcall = Ctr::where('contact_id', $call['InitialContactId'])->first(); 
+                //print_r($initialcall); 
+                
+                $initialcall = json_decode(json_encode($initialcall), true);
+                $initialcall_array = json_decode($initialcall['cdr_json'], true); 
+                //print_r($initialcall); 
 
+                $callback_review[$initialcall_array['ContactId']][$initialcall_array['ContactId']] = $initialcall;
+                if($initialcall_array["NextContactId"]){
+                    $next = $initialcall_array["NextContactId"]; 
+                    
+                    //return $next; 
+
+                    //unset($callkeys[$call['ContactId']]); 
+                    
+                    while($next){
+                        //print_r($next); 
+                        $nextcall = Ctr::where('contact_id', $next)->first();
+                        
+                        
+                        //$nextcall = (array)$nextcall; 
+                        $nextcall = json_decode(json_encode($nextcall), true); 
+                        //print_r($nextcall); 
+                        if(!$nextcall){
+                            break; 
+                        }
+                        $nextcall_array = json_decode($nextcall['cdr_json'], true); 
+
+                        $callback_review[$initialcall_array['ContactId']][$nextcall_array['ContactId']] = $nextcall;
+                        if($nextcall_array["NextContactId"]){
+                            $next = $nextcall_array["NextContactId"]; 
+                        }else{
+                            $next = false; 
+                        }
+                        if(isset($callkeys[$nextcall_array['ContactId']])){
+                            unset($callkeys[$nextcall_array['ContactId']]); 
+                        }
+                    }
+
+                    if(isset($callkeys[$initialcall_array['ContactId']])){
+                        unset($callkeys[$initialcall_array['ContactId']]); 
+                    }
+                }
+            }
+        }
+
+        //print_r($callback_review); 
+        //return $callback_review; 
         //print_r($callkeys); 
+
+        //return $callback_review; 
+        //print_r($callback_review); 
+
+        
+        foreach($callback_review as $key => $array){
+            //print_r($array); 
+            $initialcall = $array; 
+            foreach($array as $initialcall){
+                $call_array = json_decode(json_encode($initialcall), true); 
+                
+                $initialcall_array = json_decode($call_array['cdr_json'], true); 
+                //print_r($initialcall_array);
+                //$contact_duration = $initialcall_array['contact_duration']; 
+
+                if($initialcall_array['ConnectedToSystemTimestamp']){
+                    $endtime = Carbon::parse($initialcall_array['ConnectedToSystemTimestamp']);
+                    $starttime = Carbon::parse($initialcall_array['DisconnectTimestamp']);
+                    $call_array['contact_duration'] = $endtime->diffInSeconds($starttime); 
+                }else{
+                    $call_array['callback_duration'] = $call_array['contact_duration'];
+                    $call_array['contact_duration'] = 0;
+                }
+
+                $callkeys[$initialcall_array['ContactId']] = $call_array; 
+
+                //print_r($call_array); 
+                
+            }
+            
+        }
 
         
 
         foreach($callkeys as $call){
             $callcount ++; 
-            $callduration = $call['contact_duration']; 
-
-            if($callduration == 0){
-                // Ignore records if no call duration. 
-                continue; 
-            }
-
-            if($callduration < 60){
-                $callduration = 60; 
-            }
-
-            $time = $time + $callduration; 
+            $callduration = $call['contact_duration'];  
 
             if($call['queue'] && $call['queue_duration'] > 0){
                 if(!$call['connect_to_agent_time'] && !$call['next_contact_id']){
@@ -548,12 +652,13 @@ class Ctr extends Model
                     $callsummary['inbound'][] = $call; 
                     continue; 
                 }
+                
                 if($call['initiation_method'] == "CALLBACK"){
                     $callsummary['callbacks'][] = $call; 
                     continue; 
                 }
                 if(!$call['connect_to_agent_time'] && $call['next_contact_id']){
-                    $callsummary['other_prob_callback'][] = $call; 
+                    $callsummary['inbound_callback'][] = $call; 
                     continue; 
                 }
                 //print_r($call); 
@@ -564,6 +669,10 @@ class Ctr extends Model
             }
             elseif($call['disconnect_reason'] == "CONTACT_FLOW_DISCONNECT"){
                 $callsummary['inboundtimeouts'][] = $call;
+                continue; 
+            }
+            elseif($call['disconnect_reason'] == "THIRD_PARTY_DISCONNECT"){
+                $callsummary['transfer'][] = $call;
                 continue; 
             }
             else{
@@ -581,31 +690,132 @@ class Ctr extends Model
             }
         }
 
-        //print_r($callsummary).PHP_EOL;
+        
 
+        //print_r($callsummary).PHP_EOL;
+        return $callsummary; 
+    }
+
+
+    public static function agent_summary_report($calls){
+
+        $callsummary = self::get_call_types($calls); 
+
+        $agent_calls = []; 
+        foreach($callsummary as $key => $value){
+            //print_r($key); 
+            $count = 0; 
+            
+            foreach($value as $call){
+                if(!$call['agent']){
+                    continue; 
+                }
+                if($call['initiation_method'] == "INBOUND" && $call['connect_to_agent_time']){
+                    $callsummary['inbound'][] = $call; 
+                    $agent = $call['agent']; 
+                    if(!array_key_exists($key, $agent_calls)){
+                        $agent_calls[$key] = []; 
+                    }
+                    if(!array_key_exists($agent, $agent_calls[$key])){
+                        $agent_calls[$key][$agent]['calls'] = 1;
+                        $agent_calls[$key][$agent]['time'] = $call['connect_to_agent_duration'];
+                    }else{
+                        $agent_calls[$key][$agent]['calls'] = $agent_calls[$key][$agent]['calls'] + 1; 
+                        $agent_calls[$key][$agent]['time'] = $agent_calls[$key][$agent]['time'] + $call['connect_to_agent_duration'];
+                    }
+                }
+                
+            }
+        }
+
+        return $agent_calls; 
+    }
+    
+
+
+    public static function call_summary_report($calls){
+
+        $callsummary = self::get_call_types($calls); 
+
+        $callcount = 0; 
+        $time = 0; 
+        $agenttime = 0; 
+        $transfertime = 0; 
         $report = []; 
         foreach($callsummary as $key => $value){
             //print $key.": ". count($value).PHP_EOL;
-            $report[$key] = count($value);
+            if(is_array($value)){
+                $report[$key] = count($value); 
+
+                foreach($value as $call){
+                    $callcount ++; 
+                    $callduration = $call['contact_duration']; 
+        
+                    if($callduration == 0){
+                        // Ignore records if no call duration. 
+                        //continue; 
+                    }
+        
+                    if($callduration < 60){
+                        $callduration = 60; 
+                    }
+        
+                    $time = $time + $callduration; 
+
+                    if($call['connect_to_agent_duration']){
+                        //print_r($call); 
+                        $agenttime =  $agenttime + $call['connect_to_agent_duration'];
+                    }
+                    
+                    if($key == 'transfer'){
+                        
+                        //print_r($call); 
+                        //$inboundhangups[] = $call;
+                        $json = json_decode($call['cdr_json'], true); 
+                        
+                        if($json['TransferCompletedTimestamp']){
+                            $endtime = Carbon::parse($json['DisconnectTimestamp']);
+                            $transferstart = Carbon::parse($json['TransferCompletedTimestamp']);
+        
+                            $calltransfertime = $endtime->diffInSeconds($transferstart); 
+
+                            
+                            $transfertime = $transfertime + $calltransfertime;
+                            continue; 
+                        }
+                    }
+                }
+            }else{
+                continue; 
+            }
         }
 
         $report['seconds'] = $time; 
 
         $minutes = $time / 60;
+        $agenttime = $agenttime / 60;
+        $transfertime = $transfertime / 60;
         $report['minutes'] = $minutes; 
+        $report['transfertime'] = $transfertime; 
         //print $minutes.PHP_EOL; 
-        $cost_per_minute = .018 + .015 + 0.0022; // Connect Cost per min + Contact Lens per min+ Telecom DID per min. .0352 per min
-        $usage_cost = $minutes * $cost_per_minute;
+        //$cost_per_minute = .018 + .015 + 0.0022; // Connect Cost per min + Contact Lens per min+ Telecom DID per min. .0352 per min
+        //$usage_cost = $minutes * $cost_per_minute;
         //print $callcount; 
         //$transaction_cost = $callcount * .025; 
         $report['totalcalls'] = $callcount; 
-        $report['cost'] = $usage_cost; 
+        //$report['cost'] = $usage_cost; 
+
+        $report['lenscost'] = $agenttime * .015; // Lens only analyses calls connected to an agent. 
+        $report['telecocost'] = ($minutes + $transfertime) * 0.0022; // This equals inbound costs plus any outound costs due to external transfers. 
+        $report['connectcost'] = ($minutes + $transfertime) * .018; // This equals inbound costs plus any outound costs due to external transfers. 
+
+        $report['totalcost'] = $report['lenscost'] + $report['telecocost'] + $report['connectcost']; 
 
         //$report['report'] = $callsummary; 
 
         //print_r($report); 
+        //$report['agentsummary'] = $agent_calls; 
 
         return $report; 
     }
-
 }

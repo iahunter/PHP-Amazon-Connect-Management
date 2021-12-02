@@ -59,6 +59,10 @@ class GetCtrRecordsFromS3 extends Command
 
 		$buckets = CtrBuckets::all(); 
 
+		if(!$buckets){
+			return; 
+		}
+
 		foreach($buckets as $bucketobject){
 
 
@@ -77,8 +81,8 @@ class GetCtrRecordsFromS3 extends Command
 				$this->app_secret = env('AMAZON_SECRET'); 
 			}
 
-			print $this->app_key.PHP_EOL; 
-			print $this->app_secret.PHP_EOL; 
+			//print $this->app_key.PHP_EOL; 
+			//print $this->app_secret.PHP_EOL; 
 
 			$bucket = $bucketobject->name; 
 			
@@ -94,30 +98,42 @@ class GetCtrRecordsFromS3 extends Command
 
 			$lastest = Ctr::get_last_record_from_bucket($bucket); 
 
-			/*
-			$objects = $s3Client->getIterator('ListObjects', array(
-				"Bucket" => $bucket,
-				"Prefix" => 'ctr-' //must have the trailing forward slash "/"
-			));
-			
-			*/ 
-			// Trying to speed this up by getting records only after the last record in our DB. 
-			$objects = $s3Client->listObjectsV2([
-				'Bucket' => $bucket,
-				'Prefix' => 'ctr-', //must have the trailing forward slash "/"
-				'StartAfter' => $lastest,
-			]);
+			if($lastest){
+				// Trying to speed this up by getting records only after the last record in our DB. 
+				$objects = $s3Client->listObjectsV2([
+					'Bucket' => $bucket,
+					'Prefix' => 'ctr-', //must have the trailing forward slash "/"
+					'StartAfter' => $lastest,
+				]);
+			}else{
+				$objects = $s3Client->listObjects([
+					"Bucket" => $bucket,
+					"Prefix" => 'ctr-' //must have the trailing forward slash "/"
+				]);
+			}
 
+			print_r($objects); 
+
+			if(!(array)$objects){
+				print_r($objects);
+				print "No Objects... Skipping Bucket: $bucket".PHP_EOL; 
+				continue;  
+			}
+			
 
 			$now = Carbon::now();
 			$cutoff = Carbon::now()->subDays(60);
 
-			//print_r($objects);
+			print_r($objects);
 
 			//die(); 
 			
 			$key_array = []; 
 			$inserts = []; 
+			if(empty($objects['Contents'])){
+				continue; 
+			}
+			
 			foreach ($objects['Contents'] as $object) {
 				//print_r($object); 
 

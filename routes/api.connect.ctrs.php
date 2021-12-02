@@ -176,6 +176,33 @@ Route::get('/ctrs/{instance}/report/month/', [ConnectCtrController::class, 'mont
 
 /**
  * @OA\Get(
+ *   path="/api/ctrs/{instance}/report/months/daily",
+ *   tags={"CTRs"},
+ *     summary="Get Summary Ctr Report",
+ *     description="",
+ *     @OA\Parameter(
+ *         name="instance",
+ *         in="path",
+ *         description="Get instance Daily Call Report for the Month",
+ *         required=true,
+ *         @OA\Schema(
+ *             type="string",
+ *         ),
+ *     ),
+ *   @OA\Response(
+ *     response=200,
+ *     description="successful operation"
+ *   ),
+ *	 security={
+ *     {"passport": {}},
+ *   },
+ * )
+ **/
+
+Route::get('/ctrs/{instance}/report/months/daily', [ConnectCtrController::class, 'monthsDailyCallSummary'])->name('instance.callreport');
+
+/**
+ * @OA\Get(
  *   path="/api/ctrs/{instance}/report/week",
  *   tags={"CTRs"},
  *     summary="Get Summary Ctr Report",
