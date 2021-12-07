@@ -794,16 +794,21 @@ END;
     {
         $result = $this->ConnectClient->listInstances();
         $instances = $result['InstanceSummaryList'];
-
-        foreach($instances as $i){
-            if($i['InstanceAlias'] == $this->instance_alias){
-                print "Connect already exists with alias $this->instance_alias".PHP_EOL;
-                $instance_id = $i['Id'];
-                $instance = $this->ConnectClient->describeInstance(['InstanceId' => $instance_id]);
-                //die();
-                return $instance; 
-            } 
+        print_r($instances); 
+        if($instances){
+            foreach($instances as $i){
+                if(isset($i['InstanceAlias'])){
+                    if($i['InstanceAlias'] == $this->instance_alias){
+                        print "Connect already exists with alias $this->instance_alias".PHP_EOL;
+                        $instance_id = $i['Id'];
+                        $instance = $this->ConnectClient->describeInstance(['InstanceId' => $instance_id]);
+                        //die();
+                        return $instance; 
+                    } 
+                }
+            }
         }
+        
 
         //print_r($instance);
         try{
