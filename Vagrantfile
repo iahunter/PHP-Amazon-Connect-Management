@@ -47,7 +47,7 @@ Vagrant.configure("2") do |config|
   ###########################################################
   # CHANGE TO YOUR LOCAL FILE PATH FOR YOUR VAGRANT PROJECT
   #config.vm.synced_folder "c:/DevProjects/php-amazon-connect-management", "/opt/php-amazon-connect-management"
-  config.vm.synced_folder ".", "/opt/php-amazon-connect-management"
+  config.vm.synced_folder ".", "/opt/php-amazon-connect-management", :mount_options => ['dmode=777', 'fmode=777']
   ###########################################################
 
   # Provider-specific configuration so you can fine-tune various

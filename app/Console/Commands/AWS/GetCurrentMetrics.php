@@ -111,7 +111,10 @@ class GetCurrentMetrics extends Command
                         print_r($instancelist);
                     }catch(AwsException $e){
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
-                        die();
+                        echo "Exception found trying to listInstances... Killing service...".PHP_EOL; 
+                        Log::info('Showing the user profile for user: '.$id);
+                        sleep(5); 
+                        die();;
                     }
             
                     $instances = []; 
@@ -124,6 +127,8 @@ class GetCurrentMetrics extends Command
                             print_r($queueslist);
                         }catch(AwsException $e){
                             echo 'Caught exception: ',  $e->getMessage(), "\n";
+                            echo "Exception found trying to listQueues... Killing service...".PHP_EOL; 
+                            sleep(5); 
                             die();
                         }
 
@@ -191,6 +196,9 @@ class GetCurrentMetrics extends Command
                                 //die();
                             }catch(AwsException $e){
                                 echo 'Caught exception: ',  $e->getMessage(), "\n";
+                                echo "Exception found trying to getCurrentMetricData... Killing service...".PHP_EOL; 
+                                sleep(5); 
+                                die();
                                 continue;
                             }
                             $stats = []; 
@@ -224,7 +232,7 @@ class GetCurrentMetrics extends Command
 
                         }
 
-                        Cache::put($instance['Id'], $instances, 60);
+                        Cache::put($instance['Id'], $instances, 300);
                         $instances = []; 
 
                     }
@@ -233,6 +241,7 @@ class GetCurrentMetrics extends Command
 
             }
             
+            print "End of Iteration... Waiting 5 seconds to start again...".PHP_EOL; 
             sleep(5); 
         }
     }   
