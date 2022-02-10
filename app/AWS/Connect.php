@@ -132,6 +132,43 @@ class Connect
     }
 
     public function backupAgentStatus($instance){
+
+        $loop = true; 
+        $instance_statuss = []; 
+        $nexttoken = null; 
+
+        // Amazon has a limit of 1000 with default of 100 results to be returned in single request. So must loop if next token is returned with list. 
+        while($loop){
+
+            $request_array = [
+                'InstanceId' => $this->instance_id, // REQUIRED
+                'MaxResults' => 1000,
+            ]; 
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->ListAgentStatuses($request_array);
+                //print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            if(isset($result['AgentStatusSummaryList']) && count($result['AgentStatusSummaryList'])){
+                foreach($result['AgentStatusSummaryList'] as $i){
+                    $instance_statuss[] = $i; 
+                }
+            }
+        }
         // Get Custom Flows and Store in the Database
         $statuses = $this->ConnectClient->listAgentStatuses([
             'InstanceId' => $instance['Id'],
@@ -140,40 +177,80 @@ class Connect
 
         $statuslist = [];
 
-        if(isset($statuses['AgentStatusSummaryList']) && count($statuses['AgentStatusSummaryList'])){
-            foreach($statuses['AgentStatusSummaryList'] as $status){
-                // Need to possibly queue these jobs in case they error out. 
-                try{
-                    $getresult = $this->ConnectClient->describeAgentStatus([
-                        'AgentStatusId' => $status['Id'],
-                        'InstanceId' => $instance['Id'],
-                    ]);
-                }catch(AwsException $e){
-                    echo 'Caught exception: ',  $e->getMessage(), "\n";
-                    continue;
-                }
-                
-                
-                //print_r($getresult);
-                $statuslist[] = $getresult['AgentStatus'];
 
-                sleep(1);
+        foreach($instance_statuss as $status){
+            // Need to possibly queue these jobs in case they error out. 
+            try{
+                $getresult = $this->ConnectClient->describeAgentStatus([
+                    'AgentStatusId' => $status['Id'],
+                    'InstanceId' => $instance['Id'],
+                ]);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                continue;
             }
+            
+            
+            //print_r($getresult);
+            $statuslist[] = $getresult['AgentStatus'];
+
+            sleep(1);
         }
+
 
         return $statuslist;
     }
 
     public function backupUsers($instance){
         // Get Custom Flows and Store in the Database
-        $users = $this->ConnectClient->listUsers([
-            'InstanceId' => $instance['Id'],
-        ]);
+
+        $loop = true; 
+        $instance_users = []; 
+        $nexttoken = null; 
+
+        // Amazon has a limit of 1000 with default of 100 users to be returned in single request. So must loop if next token is returned with list. 
+        while($loop){
+
+            $request_array = [
+                'InstanceId' => $instance['Id'], // REQUIRED
+                'MaxResults' => 1000,
+            ]; 
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listUsers($request_array);
+                //print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            if(isset($result['UserSummaryList']) && count($result['UserSummaryList'])){
+                foreach($result['UserSummaryList'] as $user){
+                    $instance_users[] = $user; 
+                }
+            }
+
+
+
+            sleep(1); 
+        }
+        
+        //print_r($instance_users); 
 
         $userlist = [];
 
-        if(isset($users['UserSummaryList']) && count($users['UserSummaryList'])){
-            foreach($users['UserSummaryList'] as $user){
+        if(count($instance_users)){
+            foreach($instance_users as $user){
                 // Need to possibly queue these jobs in case they error out. 
                 try{
                     $getresult = $this->ConnectClient->describeUser([
@@ -181,6 +258,7 @@ class Connect
                         'InstanceId' => $instance['Id'],
                     ]);
                 }catch(AwsException $e){
+                    print_r($user); 
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
                     continue;
                 }
@@ -192,6 +270,8 @@ class Connect
                 sleep(1);
             }
         }
+
+
 
         return $userlist;
     }
@@ -305,24 +385,55 @@ class Connect
         if(isset($profiles['SecurityProfileSummaryList']) && count($profiles['SecurityProfileSummaryList'])){
             
             // AWS Lacks Describe Security Profile at the moment. May add when they make it available from API. 
-            /*
+            
+            
             foreach($profiles['SecurityProfileSummaryList'] as $i){
                 // Need to possibly queue these jobs in case they error out. 
                 try{
-                    $getresult = $this->ConnectClient->describeSecurityProfileProfile([
+                    $getresult = $this->ConnectClient->describeSecurityProfile([
                         'SecurityProfileId' => $i['Id'],
                         'InstanceId' => $instance['Id'],
                     ]);
+
                 }catch(AwsException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
                     continue;
                 }
                 
                 //print_r($getresult);
-                $list[] = $getresult['RoutingProfile'];
-            }*/
-            $list = $profiles['SecurityProfileSummaryList']; 
+
+                $profile = $getresult['SecurityProfile']; 
+
+                // Add the Name Key for legacy code matching. Cause I'm lazy...
+                if(isset($profile['SecurityProfileName'])){
+                    $profile['Name'] = $profile['SecurityProfileName']; 
+                    //print $profile['Name'].PHP_EOL; 
+                }
+
+                // Need to possibly queue these jobs in case they error out. 
+                try{
+                    $perms = $this->ConnectClient->listSecurityProfilePermissions([
+                        'SecurityProfileId' => $i['Id'],
+                        'InstanceId' => $instance['Id'],
+                        'MaxResults' => 1000,
+                    ]);
+
+                    //print_r($perms); 
+
+
+                }catch(AwsException $e){
+                    echo 'Caught exception: ',  $e->getMessage(), "\n";
+                    continue;
+                }
+
+                $profile['Permissions'] = $perms['Permissions']; 
+
+                $list[] = $profile;
+            }
+            //$list = $profiles['SecurityProfileSummaryList']; 
         }
+
+        //print_r($list); 
 
         return $list;
     }
@@ -436,14 +547,55 @@ class Connect
 
     public function backupQuickConnects($instance){
         // Get Custom Flows and Store in the Database
+        $loop = true; 
+        $qconnects = []; 
+        $nexttoken = null; 
+
+        // Amazon has a limit of 1000 with default of 100 to be returned in single request. So must loop if next token is returned with list. 
+        while($loop){
+
+            $request_array = [
+                'InstanceId' => $instance['Id'], // REQUIRED
+                'MaxResults' => 1000,
+            ]; 
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listQuickConnects($request_array);
+                //print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            if(isset($result['QuickConnectSummaryList']) && count($result['QuickConnectSummaryList'])){
+                foreach($result['QuickConnectSummaryList'] as $qq){
+                    $qconnects[] = $qq; 
+                }
+            }
+
+            sleep(1); 
+        }
+
+        /*
         $qconnects = $this->ConnectClient->listQuickConnects([
             'InstanceId' => $instance['Id'],
         ]);
+        */
 
         $list = [];
 
-        if(isset($qconnects['QuickConnectSummaryList']) && count($qconnects['QuickConnectSummaryList'])){
-            foreach($qconnects['QuickConnectSummaryList'] as $i){
+        if(isset($qconnects) && count($qconnects)){
+            foreach($qconnects as $i){
                 // Need to possibly queue these jobs in case they error out. 
                 try{
                     $getresult = $this->ConnectClient->describeQuickConnect([
