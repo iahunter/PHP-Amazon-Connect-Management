@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect('ui');
-    return view('welcome');
+    //return view('welcome');
 });
 
 Route::get('/instances','App\Http\Controllers\ConnectInstanceController@list')->name('get_instances');

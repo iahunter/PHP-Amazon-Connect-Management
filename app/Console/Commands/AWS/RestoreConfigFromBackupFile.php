@@ -190,7 +190,7 @@ class RestoreConfigFromBackupFile extends Command
         print "End Time: ".$endtime.PHP_EOL; 
 
         // Jobs that have to be done manually via the GUI because of lack of API support.
-        print_r($this->manual); 
+        //print_r($this->manual); 
         
 
     }

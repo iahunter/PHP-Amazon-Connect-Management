@@ -141,7 +141,7 @@ class Connect
         while($loop){
 
             $request_array = [
-                'InstanceId' => $this->instance_id, // REQUIRED
+                'InstanceId' => $instance['Id'], // REQUIRED
                 'MaxResults' => 1000,
             ]; 
 
