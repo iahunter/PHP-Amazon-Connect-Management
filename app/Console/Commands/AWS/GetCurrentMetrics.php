@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 use Aws\Connect\ConnectClient;
+use Aws\Connect\Exception\ConnectException; 
 
 use App\Models\Company;
 use App\Models\Account;
@@ -109,12 +110,12 @@ class GetCurrentMetrics extends Command
                     try{
                         $instancelist = $client->listInstances();
                         print_r($instancelist);
-                    }catch(AwsException $e){
+                    }catch(ConnectException $e){
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
                         echo "Exception found trying to listInstances... Killing service...".PHP_EOL; 
                         Log::info('Showing the user profile for user: '.$id);
                         sleep(5); 
-                        die();;
+                        die();
                     }
             
                     $instances = []; 
@@ -125,7 +126,7 @@ class GetCurrentMetrics extends Command
                         try{
                             $queueslist = $client->listQueues(['InstanceId' => $instance['Id']]);
                             print_r($queueslist);
-                        }catch(AwsException $e){
+                        }catch(ConnectException $e){
                             echo 'Caught exception: ',  $e->getMessage(), "\n";
                             echo "Exception found trying to listQueues... Killing service...".PHP_EOL; 
                             sleep(5); 
@@ -194,7 +195,7 @@ class GetCurrentMetrics extends Command
                                 ]);
                                 print_r($result);
                                 //die();
-                            }catch(AwsException $e){
+                            }catch(ConnectException $e){
                                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                                 echo "Exception found trying to getCurrentMetricData... Killing service...".PHP_EOL; 
                                 sleep(5); 

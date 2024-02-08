@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return redirect('ui');
+    return redirect('ui/#/admin');
     //return view('welcome');
 });
 

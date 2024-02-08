@@ -79,7 +79,7 @@ class RestoreConfigFromBackupFile extends Command
 
 
 
-        print_r($this->backup); 
+        //print_r($this->backup); 
 
         /*
         foreach($array as $type => $objects){
@@ -159,7 +159,7 @@ class RestoreConfigFromBackupFile extends Command
         print_r($keyindex); 
 
         $instance = $this->choice('Plese choose the Instance to restore the backup to.', $instance_alias);
-        print_r($instance); 
+        //print_r($instance); 
 
         print_r($keyindex[$instance]); 
 
@@ -173,17 +173,49 @@ class RestoreConfigFromBackupFile extends Command
 
         $starttime = \Carbon\Carbon::now();
         echo Carbon::now().' Starting: '.PHP_EOL;
-        
+
+        /*
+        print "***************************".PHP_EOL;
+        print "restore_hours_of_operation".PHP_EOL; 
         $this->restore_hours_of_operation();
+
+        print "***************************".PHP_EOL;
+        print "restore_security_profiles".PHP_EOL; 
         $this->restore_security_profiles();
+
+        print "***************************".PHP_EOL;
+        print "restore_agent_statuses".PHP_EOL; 
         $this->restore_agent_statuses();
-        $this->restore_queues(); 
+
+        print "***************************".PHP_EOL;
+        print "restore_queues".PHP_EOL; 
+        $this->restore_queues();
+
+        print "***************************".PHP_EOL;
+        print "restore_contact_flow_names".PHP_EOL; 
         $this->restore_contact_flow_names();
+
+        print "***************************".PHP_EOL;
+        print "restore_contact_flow_content".PHP_EOL; 
         $this->restore_contact_flow_content();
+
+        print "***************************".PHP_EOL;
+        print "restore_routing_profiles".PHP_EOL; 
         $this->restore_routing_profiles();
+
+        print "***************************".PHP_EOL;
+        print "restore_users".PHP_EOL; 
         $this->restore_users();
+        */
+        print "***************************".PHP_EOL;
+        print "restore_quickconnects".PHP_EOL; 
         $this->restore_quickconnects();
+
+        print "***************************".PHP_EOL;
+        print "restore_queue_quickconnects".PHP_EOL; 
         $this->restore_queue_quickconnects();
+
+
 
         print "Start Time: ".$starttime.PHP_EOL; 
         $endtime = \Carbon\Carbon::now();
@@ -235,7 +267,7 @@ class RestoreConfigFromBackupFile extends Command
         }
 
 
-        print_r($instance_statuss); 
+        //print_r($instance_statuss); 
         //die();
 
         // set array keys to queue name. 
@@ -246,15 +278,15 @@ class RestoreConfigFromBackupFile extends Command
 
         $AgentStatus = $this->backup->AgentStatus;
 
-        print_r($AgentStatus); 
+        //print_r($AgentStatus); 
 
-        print_r($current_profiles); 
+        //print_r($current_profiles); 
 
         foreach($AgentStatus as $object){
 
             // Skip these Status Types because they cannot be modified and already exist by default. 
             if($object->Type == "OFFLINE" || $object->Type == "ROUTABLE"){
-                print_r($object); 
+                //print_r($object); 
                 print "Skipping ". $object->Name ." has Type of ". $object->Type.PHP_EOL; 
                 sleep(5); 
                 continue; 
@@ -262,7 +294,7 @@ class RestoreConfigFromBackupFile extends Command
 
             // Skip these Status Types because they cannot be modified and already exist by default. 
             if($object->State == "DISABLED"){
-                print_r($object); 
+                //print_r($object); 
                 print "Skipping ". $object->Name ." has State of ". $object->State.PHP_EOL; 
                 sleep(5); 
                 continue; 
@@ -282,11 +314,11 @@ class RestoreConfigFromBackupFile extends Command
                     'Tags' => $object->Tags,
                 ]; 
 
-                print_r($newstatus); 
+                //print_r($newstatus); 
 
                 try{
                     $result = $this->ConnectClient->createAgentStatus($newstatus);
-                    print_r($result);
+                    //print_r($result);
                     print "Created AgentStatus $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -317,7 +349,7 @@ class RestoreConfigFromBackupFile extends Command
 
                 try{
                     $result = $this->ConnectClient->updateAgentStatus($newstatus);
-                    print_r($result);
+                    //print_r($result);
                     print "Updated AgentStatus $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -374,7 +406,7 @@ class RestoreConfigFromBackupFile extends Command
         }
 
 
-        print_r($instance_profiles); 
+        //print_r($instance_profiles); 
         //die();
 
         // set array keys to queue name. 
@@ -400,11 +432,11 @@ class RestoreConfigFromBackupFile extends Command
                     //'Tags' => ['<string>', ...],
                 ]; 
 
-                print_r($newprofile); 
+                //print_r($newprofile); 
 
                 try{
                     $result = $this->ConnectClient->createSecurityProfile($newprofile);
-                    print_r($result);
+                    //print_r($result);
                     print "Created SecurityProfile $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -432,7 +464,7 @@ class RestoreConfigFromBackupFile extends Command
 
                 try{
                     $result = $this->ConnectClient->updateSecurityProfile($newprofile);
-                    print_r($result);
+                    //print_r($result);
                     print "Updated SecurityProfile $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -500,7 +532,7 @@ class RestoreConfigFromBackupFile extends Command
             sleep(1); 
         }
 
-        print_r($instance_queues); 
+        //print_r($instance_queues); 
 
         $queues = []; 
         foreach($this->backup->Queues as $queue){
@@ -527,7 +559,7 @@ class RestoreConfigFromBackupFile extends Command
             $queues[$queue['Name']]["destination"] = $queue; 
         }
 
-        print_r($queues); 
+        //print_r($queues); 
 
         // Get Quick Connects. 
         try{
@@ -542,7 +574,7 @@ class RestoreConfigFromBackupFile extends Command
 
         $instance_quick_connects = $result['QuickConnectSummaryList']; 
 
-        print_r($instance_quick_connects); 
+        //print_r($instance_quick_connects); 
 
         $quickconnects = []; 
         foreach($this->backup->QuickConnects as $i){
@@ -569,16 +601,16 @@ class RestoreConfigFromBackupFile extends Command
             $quickconnects[$i['Name']]["destination"] = $i; 
         }
 
-        print_r($quickconnects); 
+        //print_r($quickconnects); 
 
 
-        print_r($queues); 
+        //print_r($queues); 
 
         foreach($this->backup->Queues as $object){
 
             $array = json_decode(json_encode($object), true); 
 
-            print_r($array); 
+            //print_r($array); 
 
             if(!isset($array['Name'])){
                 continue; 
@@ -602,22 +634,22 @@ class RestoreConfigFromBackupFile extends Command
                 $newcontent = str_replace($i['source']['QuickConnectId'], $i['destination']['Id'], $newcontent);
             }
 
-            print_r($object);
+            //print_r($object);
             $newcontent = json_decode($newcontent); 
 
             //print_r($newcontent); 
 
             $new_array = json_decode(json_encode($newcontent), true); 
 
-            print_r($new_array); 
+            //print_r($new_array); 
 
             $queue_quick_connects_backup = $new_array['QuickConnectSummaryList']; 
             
-            print_r($queues); 
+            //print_r($queues); 
 
-            print_r($new_array['Name']); 
+            //print_r($new_array['Name']); 
 
-            print_r($instance_queues); 
+            //print_r($instance_queues); 
             $queue_id = $queues[$new_array['Name']]["destination"]['Id'];
 
             try{
@@ -625,7 +657,7 @@ class RestoreConfigFromBackupFile extends Command
                     'InstanceId' => $this->instance_id, // REQUIRED
                     'QueueId' => $queue_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(ConnectException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 die();
@@ -634,8 +666,8 @@ class RestoreConfigFromBackupFile extends Command
 
             $queue_quick_connects_current = $result['QuickConnectSummaryList']; 
 
-            print_r($queue_quick_connects_backup); 
-            print_r($queue_quick_connects_current);
+            // print_r($queue_quick_connects_backup); 
+            //print_r($queue_quick_connects_current);
             
             // Rekey the array so we can search by name. 
             $backup_qqs = []; 
@@ -659,7 +691,7 @@ class RestoreConfigFromBackupFile extends Command
                 $quickconnectsnow[$i['Name']] = $i; 
             }
     
-            print_r($quickconnectsnow); 
+            //print_r($quickconnectsnow); 
 
             foreach($backup_qqs as $qq){
                 if(!array_key_exists($qq['Name'], $current_qqs)){
@@ -676,7 +708,7 @@ class RestoreConfigFromBackupFile extends Command
                             'QueueId' => $queue_id, // REQUIRED
                             'QuickConnectIds' => [$qq['Id']], // REQUIRED
                         ]);
-                        print_r($result);
+                        //print_r($result);
                         print "Associated QuickConnect {$qq['Name']} to {$array['Name']} $queue_id!!!".PHP_EOL;
                     }catch(ConnectException $e){
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -706,7 +738,7 @@ class RestoreConfigFromBackupFile extends Command
                             'QueueId' => $queue_id, // REQUIRED
                             'QuickConnectIds' => [$qq['Id']], // REQUIRED
                         ]);
-                        print_r($result);
+                        //print_r($result);
                         print "Disassociated QuickConnect {$qq['Name']} from {$array['Name']} $queue_id!!!".PHP_EOL; 
                     }catch(ConnectException $e){
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -724,7 +756,7 @@ class RestoreConfigFromBackupFile extends Command
                     'InstanceId' => $this->instance_id, // REQUIRED
                     'QueueId' => $queue_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(ConnectException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 die();
@@ -737,7 +769,46 @@ class RestoreConfigFromBackupFile extends Command
     }
 
     public function restore_quickconnects(){
-        
+
+        $loop = true;
+        $nexttoken = null;
+        $instance_queues = []; 
+
+        while($loop){
+            $request_array =[
+                'InstanceId' => $this->instance_id,
+            ];
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listQueues($request_array);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                //sleep(1);
+                continue;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            
+            if(isset($result['QueueSummaryList']) && count($result['QueueSummaryList'])){
+                foreach($result['QueueSummaryList'] as $i){
+                    $instance_queues[] = $i;
+                }
+            }
+
+            sleep(1);
+
+        }
+
+        /*
         try{
             $result = $this->ConnectClient->listQueues([
                 'InstanceId' => $this->instance_id, // REQUIRED
@@ -750,7 +821,8 @@ class RestoreConfigFromBackupFile extends Command
 
         $instance_queues = $result['QueueSummaryList']; 
 
-        print_r($instance_queues); 
+        //print_r($instance_queues); 
+        */
 
         $queues = []; 
         foreach($this->backup->Queues as $queue){
@@ -783,7 +855,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listContactFlows([
                 'InstanceId' => $this->instance['Id'], // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -805,7 +877,7 @@ class RestoreConfigFromBackupFile extends Command
         // Get Source Flow
         foreach($ContactFlows as $flow){
             $flow = json_decode(json_encode($flow), true); 
-            print_r($flow); 
+            //print_r($flow); 
             if(!array_key_exists($flow['Name'], $flows)){
                 $flows[$flow['Name']] = []; 
             }
@@ -875,7 +947,7 @@ class RestoreConfigFromBackupFile extends Command
             sleep(1); 
         }
         
-        print_r($instance_users); 
+        //print_r($instance_users); 
 
         $users = []; 
         $backup_userids = []; 
@@ -906,7 +978,7 @@ class RestoreConfigFromBackupFile extends Command
             $users[$user['Username']]["destination"] = $user; 
         }
 
-        print_r($users); 
+        //print_r($users); 
 
         // Get QuickConects
 
@@ -916,7 +988,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listQuickConnects([
                 'InstanceId' => $this->instance_id, // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -963,15 +1035,15 @@ class RestoreConfigFromBackupFile extends Command
 
             foreach($users as $i){
                 if(!isset($i['source']) || !isset($i['destination'])){
-                    print_r($i); 
+                    //print_r($i); 
                     continue;
                 }
 
-                print_r($i); 
+                //print_r($i); 
                 //$newcontent = str_replace($i['source']['Arn'], $i['destination']['Arn'], $newcontent);
                 $newcontent = str_replace($i['source']['Id'], $i['destination']['Id'], $newcontent);
             }
-            print_r($object);
+            //print_r($object);
             $newcontent = json_decode($newcontent); 
 
             //print_r($newcontent); 
@@ -994,7 +1066,7 @@ class RestoreConfigFromBackupFile extends Command
             unset($new_object['QuickConnectARN']);
             $new_object['InstanceId'] = $this->instance_id; 
             
-            print_r($instance_qc); 
+            //print_r($instance_qc); 
 
             if(!array_key_exists($new_object['Name'], $instance_qc)){
 
@@ -1002,13 +1074,13 @@ class RestoreConfigFromBackupFile extends Command
 
                 $this->manual[] = $new_object; 
 
-                print_r($new_object); 
+                //print_r($new_object); 
 
                
 
                 try{
                     $result = $this->ConnectClient->createQuickConnect($new_object);
-                    print_r($result);
+                    //print_r($result);
                     print "Created QuickConnect {$new_object['Name']}!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1075,7 +1147,7 @@ class RestoreConfigFromBackupFile extends Command
             $routing_profiles[$profile['Name']]["destination"] = $profile; 
         }
 
-        print_r($routing_profiles); 
+        //print_r($routing_profiles); 
 
         
 
@@ -1111,7 +1183,7 @@ class RestoreConfigFromBackupFile extends Command
             $security_profiles[$profile['Name']]["destination"] = $profile; 
         }
 
-        print_r($security_profiles); 
+        //print_r($security_profiles); 
 
     
         $Users = $this->backup->Users;
@@ -1146,11 +1218,11 @@ class RestoreConfigFromBackupFile extends Command
 
             $newcontent = json_decode($newcontent); 
 
-            print_r($newcontent); 
+            //print_r($newcontent); 
 
             $new_user = json_decode(json_encode($newcontent), true); 
 
-            print_r($new_user); 
+            //print_r($new_user); 
 
             $loop = true; 
             $instance_users = []; 
@@ -1189,7 +1261,7 @@ class RestoreConfigFromBackupFile extends Command
                 sleep(1); 
             }
             
-            print_r($instance_users); 
+            //print_r($instance_users); 
 
             //$instance_users = $result['UserSummaryList']; 
 
@@ -1207,7 +1279,7 @@ class RestoreConfigFromBackupFile extends Command
 
             $new_user['InstanceId'] = $this->instance_id; 
             
-            print_r($new_user); 
+            //print_r($new_user); 
 
 
             if(!array_key_exists($new_user['Username'], $current_users)){
@@ -1216,13 +1288,13 @@ class RestoreConfigFromBackupFile extends Command
 
                 $this->manual[] = $new_user; 
 
-                print_r($new_user); 
+                //print_r($new_user); 
 
                
 
                 try{
                     $result = $this->ConnectClient->createUser($new_user);
-                    print_r($result);
+                    //print_r($result);
                     print "Created User {$new_user['Username']}!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     print_r($current_users); 
@@ -1321,9 +1393,9 @@ class RestoreConfigFromBackupFile extends Command
                     $newcontent = str_replace($queue['source']['QueueId'], $queue['destination']['Id'], $newcontent);
 
                     if(!$set){
-                        print $object->DefaultOutboundQueueId.PHP_EOL; 
+                        //print $object->DefaultOutboundQueueId.PHP_EOL; 
                         $defaultOutboundQueueId = str_replace($queue['source']['QueueId'], $queue['destination']['Id'], $object->DefaultOutboundQueueId);
-                        print $defaultOutboundQueueId.PHP_EOL; 
+                        //print $defaultOutboundQueueId.PHP_EOL; 
                         if($defaultOutboundQueueId != $object->DefaultOutboundQueueId){
                             $set = 1; 
                         }
@@ -1335,7 +1407,7 @@ class RestoreConfigFromBackupFile extends Command
                 $new_array[] = $newcontent; 
             }
             
-            print_r($new_array);
+            //print_r($new_array);
 
             print "Default Queue ID: ".$defaultOutboundQueueId.PHP_EOL; 
 
@@ -1369,7 +1441,7 @@ class RestoreConfigFromBackupFile extends Command
 
             $mediaConcurrencies = json_decode(json_encode($object->MediaConcurrencies), true);
 
-            print_r($mediaConcurrencies); 
+            //print_r($mediaConcurrencies); 
             
             // Build Routing Profile and assign Queue Members
             $profile = [
@@ -1386,7 +1458,7 @@ class RestoreConfigFromBackupFile extends Command
                 $result = $this->ConnectClient->listRoutingProfiles([
                     'InstanceId' => $this->instance_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(AwsException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 return;
@@ -1406,13 +1478,13 @@ class RestoreConfigFromBackupFile extends Command
 
                 $this->manual[] = $object; 
 
-                print_r($profile); 
+                //print_r($profile); 
 
                
 
                 try{
                     $result = $this->ConnectClient->createRoutingProfile($profile);
-                    print_r($result);
+                    //print_r($result);
                     print "Created Routing Profile $object->Name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1433,7 +1505,7 @@ class RestoreConfigFromBackupFile extends Command
                 $result = $this->ConnectClient->listRoutingProfiles([
                     'InstanceId' => $this->instance_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(AwsException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 return;
@@ -1449,11 +1521,11 @@ class RestoreConfigFromBackupFile extends Command
                 $current_profiles[$p['Name']] = $p; 
             }
 
-            print_r($current_profiles); 
+            //print_r($current_profiles); 
 
             if(isset($current_profiles[$object->Name])){
                 $routingProfile = $current_profiles[$object->Name];
-                print_r($routingProfile); 
+                //print_r($routingProfile); 
                 
                 $update = [
                     'InstanceId' => $this->instance_id, // REQUIRED
@@ -1465,7 +1537,7 @@ class RestoreConfigFromBackupFile extends Command
                 // Update the concurrency limits for the routing profile. 
                 try{
                     $result = $this->ConnectClient->updateRoutingProfileConcurrency($update);
-                    print_r($result);
+                    //print_r($result);
                     print "Updated Routing Profile $object->Name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1484,7 +1556,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listContactFlows([
                 'InstanceId' => $this->instance['Id'], // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -1492,7 +1564,7 @@ class RestoreConfigFromBackupFile extends Command
 
         $instance_flows = $result['ContactFlowSummaryList']; 
 
-        print_r($instance_flows); 
+        //print_r($instance_flows); 
         //die();
 
         // set array keys to queue name. 
@@ -1516,7 +1588,7 @@ class RestoreConfigFromBackupFile extends Command
                             'ContactFlowId' => $flow['Id'], // REQUIRED
                             'InstanceId' => $this->instance['Id'], // REQUIRED
                         ]);
-                        print_r($result);
+                        //print_r($result);
                         sleep(2);
                     }catch(AwsException $e){
                         echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1528,7 +1600,7 @@ class RestoreConfigFromBackupFile extends Command
 
             $content = $result['ContactFlow']['Content']; 
 
-            print_r($content); 
+            //print_r($content); 
             //$blank_content = ""; 
 
             //$default_content = json_decode($blank_content); 
@@ -1554,11 +1626,11 @@ class RestoreConfigFromBackupFile extends Command
 
                 $this->manual[] = $object; 
 
-                print_r($flow); 
+                //print_r($flow); 
 
                 try{
                     $result = $this->ConnectClient->createContactFlow($flow);
-                    print_r($result);
+                    //print_r($result);
                     print "Created Flow $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1584,7 +1656,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listContactFlows([
                 'InstanceId' => $this->instance['Id'], // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -1606,7 +1678,7 @@ class RestoreConfigFromBackupFile extends Command
         // Get Source Flow
         foreach($ContactFlows as $flow){
             $flow = json_decode(json_encode($flow), true); 
-            print_r($flow); 
+            //print_r($flow); 
             if(!array_key_exists($flow['Name'], $flows)){
                 $flows[$flow['Name']] = []; 
             }
@@ -1623,7 +1695,7 @@ class RestoreConfigFromBackupFile extends Command
             $flows[$flow['Name']]["destination"] = $flow; 
         }
 
-        print_r($flows); 
+        //print_r($flows); 
         
         //die();
         // Get prompts to replace 
@@ -1631,7 +1703,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listPrompts([
                 'InstanceId' => $this->instance['Id'], // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -1644,7 +1716,7 @@ class RestoreConfigFromBackupFile extends Command
 
         foreach($backup_prompts as $prompt){
             $prompt = json_decode(json_encode($prompt), true); 
-            print_r($prompt); 
+            //print_r($prompt); 
             if(!array_key_exists($prompt['Name'], $prompts)){
                 $prompts[$prompt['Name']] = []; 
             }
@@ -1667,7 +1739,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listHoursOfOperations([
                 'InstanceId' => $this->instance_id, // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -1678,7 +1750,7 @@ class RestoreConfigFromBackupFile extends Command
         $hours = []; 
         foreach($this->backup->HoursOfOperations as $hour){
             $hour = json_decode(json_encode($hour), true); 
-            print_r($hour); 
+            //print_r($hour); 
             if(!array_key_exists($hour['Name'], $hours)){
                 $hours[$hour['Name']] = []; 
             }
@@ -1760,7 +1832,7 @@ class RestoreConfigFromBackupFile extends Command
                 if(!isset($hour['source']) || !isset($hour['destination'])){
                     continue; 
                 }
-                print_r($hour); 
+                //print_r($hour); 
                 $newcontent = str_replace($hour['source']['HoursOfOperationArn'], $hour['destination']['Arn'], $newcontent);
                 $newcontent = str_replace($hour['source']['HoursOfOperationId'], $hour['destination']['Id'], $newcontent);
             }
@@ -1769,7 +1841,7 @@ class RestoreConfigFromBackupFile extends Command
                 $result = $this->ConnectClient->listQueues([
                     'InstanceId' => $this->instance_id, // REQUIRED
                 ]);
-                print_r($result);
+                //print_r($result);
             }catch(AwsException $e){
                 echo 'Caught exception: ',  $e->getMessage(), "\n";
                 return;
@@ -1780,7 +1852,7 @@ class RestoreConfigFromBackupFile extends Command
             $queues = []; 
             foreach($this->backup->Queues as $queue){
                 $queue = json_decode(json_encode($queue), true); 
-                print_r($queue); 
+                //print_r($queue); 
                 if(!isset($queue['Name'])){
                     continue;
                 }
@@ -1791,7 +1863,7 @@ class RestoreConfigFromBackupFile extends Command
                 $queues[$queue['Name']]["source"] = $queue; 
             }
 
-            print_r($queues);
+            //print_r($queues);
             //print_r($instance_queues); 
 
             // set array keys to queue name. 
@@ -1814,13 +1886,13 @@ class RestoreConfigFromBackupFile extends Command
                 $queues[$queue['Name']]["destination"] = $queue; 
             }
     
-            print_r($queues); 
+            //print_r($queues); 
 
             //die(); 
 
             // Fix Queue Info
             foreach($queues as $queue){
-                print_r($queue); 
+                //print_r($queue); 
                 if(!isset($queue['source']) || !isset($queue['destination'])){
                     continue; 
                 }
@@ -1833,7 +1905,7 @@ class RestoreConfigFromBackupFile extends Command
             $newcontent = str_replace($this->backup->Instance->Id, $this->instance['Id'], $newcontent); 
             
             
-            print_r($newcontent);
+            //print_r($newcontent);
 
             //die();
 
@@ -1847,13 +1919,13 @@ class RestoreConfigFromBackupFile extends Command
 
                 //print_r($object); 
 
-                print_r($flow); 
+                //print_r($flow); 
 
                
 
                 try{
                     $result = $this->ConnectClient->updateContactFlowContent($flow);
-                    print_r($result);
+                    //print_r($result);
                     print "Created Flow $name!!!".PHP_EOL; 
                 }catch(ConnectException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -1880,7 +1952,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listQueues([
                 'InstanceId' => $this->instance_id, // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -1888,7 +1960,7 @@ class RestoreConfigFromBackupFile extends Command
 
         $instance_queues = $result['QueueSummaryList']; 
 
-        print_r($instance_queues); 
+        //print_r($instance_queues); 
 
         
 
@@ -1901,7 +1973,7 @@ class RestoreConfigFromBackupFile extends Command
             $current_queues[$queue['Name']] = $queue; 
         }
 
-        print_r($current_queues); 
+        //print_r($current_queues); 
 
         $Queues = $this->backup->Queues;
 
@@ -1957,7 +2029,7 @@ class RestoreConfigFromBackupFile extends Command
             $object = json_decode(json_encode($object), true); 
 
             if(isset($object['OutboundCallerConfig'])){
-                print_r($object); 
+                //print_r($object); 
 
                 if(isset($object['OutboundCallerConfig']['OutboundCallerIdName'])){
                     $callerid_name = $object['OutboundCallerConfig']['OutboundCallerIdName']; 
@@ -1992,7 +2064,7 @@ class RestoreConfigFromBackupFile extends Command
             */
 
             print $name.PHP_EOL; 
-            print_r($current_queues); 
+            //print_r($current_queues); 
 
             if(!array_key_exists($name, $current_queues)){
 
@@ -2004,7 +2076,7 @@ class RestoreConfigFromBackupFile extends Command
 
                 try{
                     $result = $this->ConnectClient->createQueue($queue);
-                    print_r($result);
+                    //print_r($result);
                     print "Created Queue $name!!!".PHP_EOL; 
                 }catch(AwsException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -2028,7 +2100,7 @@ class RestoreConfigFromBackupFile extends Command
             $result = $this->ConnectClient->listHoursOfOperations([
                 'InstanceId' => $this->instance_id, // REQUIRED
             ]);
-            print_r($result);
+            //print_r($result);
         }catch(AwsException $e){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
             return;
@@ -2052,7 +2124,7 @@ class RestoreConfigFromBackupFile extends Command
 
                 $array = json_decode(json_encode($hours), true); 
 
-                print_r($array); 
+                //print_r($array); 
 
                 $this->manual[] = $hours; 
 
@@ -2069,7 +2141,7 @@ class RestoreConfigFromBackupFile extends Command
 
                 try{
                     $result = $this->ConnectClient->createHoursOfOperation($object);
-                    print_r($result);
+                    //print_r($result);
                     print "Created Hours of Operation: $name!!!".PHP_EOL; 
                 }catch(AwsException $e){
                     echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -2109,7 +2181,7 @@ class RestoreConfigFromBackupFile extends Command
             foreach($accounts as $account){
                 $account_ids[] = $account['account_number']; 
             }
-            $this->account_number = $this->choice('What is the account ID Name?', $account_ids);
+            $this->account_number = $this->choice('What is the account ID for the backup file?', $account_ids);
             $account = Account::where('account_number', $this->account_number)->first();
             $this->account_number = $account->account_number;
         }

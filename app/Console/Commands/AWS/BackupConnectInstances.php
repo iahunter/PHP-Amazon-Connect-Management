@@ -60,7 +60,7 @@ class BackupConnectInstances extends Command
 
 
         foreach($accountnumbers as $account){
-            $this->account_number = $account; 
+            $this->account_number = $account;
 
             $account = Account::where('account_number', $this->account_number)->first(); 
             $this->company_id = $account->company_id; 
@@ -107,8 +107,9 @@ class BackupConnectInstances extends Command
                     return;
                 }
                 
-                
                 foreach($result['InstanceSummaryList'] as $instance){
+
+                    print $instance['Id'].PHP_EOL;
 
                     if(!Storage::exists('/backups')) {
 
@@ -136,25 +137,69 @@ class BackupConnectInstances extends Command
 
 
                     $ConnectInstance = new Connect($region, $this->app_key, $this->app_secret); 
-                    $backup = []; 
-                    $storage = $ConnectInstance->backupStorageConfigs($instance); 
-                    $instanceAttributes = $ConnectInstance->backupInstanceAttributes($instance); 
-                    $numbers = $ConnectInstance->backupPhoneNumbers($instance); 
+                    $backup = [];
+
+                    //print_r($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up Storage Accounts".PHP_EOL; 
+                    $storage = $ConnectInstance->backupStorageConfigs($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up instanceAttributes".PHP_EOL; 
+                    $instanceAttributes = $ConnectInstance->backupInstanceAttributes($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up Approved Origins".PHP_EOL; 
+                    $instanceApprovedOrigins = $ConnectInstance->backupInstanceApprovedOrigins($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up Lambda Functions".PHP_EOL; 
+                    $instanceLambdaFunctions = $ConnectInstance->backupInstanceLambdaFunctions($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up numbers".PHP_EOL; 
+                    $numbers = $ConnectInstance->backupPhoneNumbers($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up prompts".PHP_EOL; 
                     $prompts = $ConnectInstance->backupPrompts($instance);
+
+                    print $instance['InstanceAlias']. " | ".  "Backing up flows".PHP_EOL; 
                     $flows = $ConnectInstance->backupContactFlows($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up users".PHP_EOL; 
                     $users = $ConnectInstance->backupUsers($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up statuses".PHP_EOL; 
                     $statuses = $ConnectInstance->backupAgentStatus($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up uhgs".PHP_EOL;
                     $uhgs = $ConnectInstance->backupUserHierarchyGroups($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up structure".PHP_EOL;
                     $structure = $ConnectInstance->backupUserHierarchyStructure($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up routingProfiles".PHP_EOL;
                     $routingProfiles = $ConnectInstance->backupRoutingProfiles($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up securityProfiles".PHP_EOL;
                     $securityProfiles = $ConnectInstance->backupSecurityProfiles($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up queues".PHP_EOL;
                     $queues = $ConnectInstance->backupQueues($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up hours".PHP_EOL;
                     $hours = $ConnectInstance->backupHoursOfOperations($instance);
+
+                    print $instance['InstanceAlias']. " | ". "Backing up quickConnects".PHP_EOL;
                     $quickConnects = $ConnectInstance->backupQuickConnects($instance);
+                    print count($quickConnects); 
                     
                     $backup['Instance'] = $instance;
-                    $backup['StorageConfigs'] = $storage; 
+                    $backup['StorageConfigs'] = $storage;
+
+
                     $backup['InstanceAttributes'] = $instanceAttributes;
+
+                    // Added 20240208
+                    $backup['InstanceApprovedOrigins'] =  $instanceApprovedOrigins; 
+                    $backup['InstanceLambdaFunctions'] =  $instanceLambdaFunctions; 
+
                     $backup['PhoneNumbers'] = $numbers;
                     $backup['Prompts'] = $prompts;
                     $backup['ContactFlows'] = $flows;

@@ -7,14 +7,10 @@ class Policy
     public function __construct()
     {
         $command = "az login"; 
+        //$command = "python3 test.py"; 
         $output = shell_exec($command);
     }
 
-
-    public function getGroupMembers($group){
-
-
-    }
 
 
 

@@ -29,6 +29,14 @@ class Connect
                     'CALL_RECORDINGS', 
                     'CONTACT_TRACE_RECORDS',
                     'AGENT_EVENTS',
+                    'CHAT_TRANSCRIPTS',
+                    'SCHEDULED_REPORTS',
+                    'MEDIA_STREAMS',
+                    'REAL_TIME_CONTACT_ANALYSIS_SEGMENTS',
+                    'ATTACHMENTS',
+                    'CONTACT_EVALUATIONS',
+                    'SCREEN_RECORDINGS'
+
         ];
         
         $storage = [];
@@ -44,6 +52,7 @@ class Connect
             sleep(1);
         }
 
+        print_r($storage); 
         return $storage; 
     }
 
@@ -60,6 +69,93 @@ class Connect
         }
 
         return $list;
+    }
+
+    public function backupInstanceApprovedOrigins($instance){
+
+        $loop = true; 
+        $instance_origins = []; 
+        $nexttoken = null; 
+
+        // Amazon has a limit of 25 results to be returned in single request. So must loop if next token is returned with list. 
+        while($loop){
+
+            $request_array = [
+                'InstanceId' => $instance['Id'], // REQUIRED
+                'MaxResults' => 25,
+            ]; 
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listApprovedOrigins($request_array);
+                //print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            if(isset($result['Origins']) && count($result['Origins'])){
+                foreach($result['Origins'] as $i){
+                    $instance_origins[] = $i; 
+                }
+            }
+        }
+
+        print_r($instance_origins); 
+        return $instance_origins;
+    }
+
+    
+    public function backupInstanceLambdaFunctions($instance){
+
+        $loop = true; 
+        $instance_lambda = []; 
+        $nexttoken = null; 
+
+        // Amazon has a limit of 25 results to be returned in single request. So must loop if next token is returned with list. 
+        while($loop){
+
+            $request_array = [
+                'InstanceId' => $instance['Id'], // REQUIRED
+                'MaxResults' => 25,
+            ]; 
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listLambdaFunctions($request_array);
+                //print_r($result);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                return;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            if(isset($result['LambdaFunctions']) && count($result['LambdaFunctions'])){
+                foreach($result['LambdaFunctions'] as $i){
+                    $instance_lambda[] = $i; 
+                }
+            }
+        }
+
+        print_r($instance_lambda); 
+        return $instance_lambda;
     }
 
     public function backupPhoneNumbers($instance){
@@ -459,6 +555,95 @@ class Connect
     }
 
     public function backupQueues($instance){
+        //
+        $loop = true;
+        $nexttoken = null;
+        $queues = []; 
+
+        while($loop){
+            $request_array =[
+                'InstanceId' => $instance['Id'],
+            ];
+
+            if($nexttoken){
+                $request_array['NextToken'] = $nexttoken; 
+            }
+
+            try{
+                $result = $this->ConnectClient->listQueues($request_array);
+            }catch(AwsException $e){
+                echo 'Caught exception: ',  $e->getMessage(), "\n";
+                //sleep(1);
+                continue;
+            }
+
+            if(isset($result['NextToken']) && $result['NextToken']){
+                $nexttoken = $result['NextToken']; 
+            }else{
+                $loop = false; 
+            }
+
+            
+            if(isset($result['QueueSummaryList']) && count($result['QueueSummaryList'])){
+                foreach($result['QueueSummaryList'] as $i){
+                    $queues[] = $i;
+                }
+            }
+
+            sleep(1);
+
+        }
+
+        $list = [];
+
+        if(count($queues)){
+            foreach($queues as $i){
+
+                $getresult = $i;
+                // Need to possibly queue these jobs in case they error out. 
+                if(isset($i['Name'])){
+                    try{
+                        $getresult = $this->ConnectClient->describeQueue([
+                            'QueueId' => $i['Id'],
+                            'InstanceId' => $instance['Id'],
+                        ]);
+                    }catch(AwsException $e){
+                        echo 'Caught exception: ',  $e->getMessage(), "\n";
+                        //sleep(1);
+                        continue;
+                    }
+                    
+                    if($getresult){
+                        $quickconnects = $this->ConnectClient->listQueueQuickConnects([
+                            'QueueId' => $i['Id'],
+                            'InstanceId' => $instance['Id'],
+                        ]);
+                    }
+
+                    if(isset($quickconnects['QuickConnectSummaryList'])){
+                        $getresult['Queue']['QuickConnectSummaryList'] = $quickconnects['QuickConnectSummaryList']; 
+                    }
+                    
+                    $list[] = $getresult['Queue'];
+
+                }else{
+                    //print_r($i); 
+                    //print_r($getresult);
+                    
+                    $list[] = $getresult;
+
+                    sleep(1);
+                }
+                
+                
+            }
+        }
+
+        return $list;
+    }
+
+    /* Backup this function... We are going to edit this for max result issue
+    public function backupQueues($instance){
         // Get Custom Flows and Store in the Database
         $queues = $this->ConnectClient->listQueues([
             'InstanceId' => $instance['Id'],
@@ -511,6 +696,7 @@ class Connect
 
         return $list;
     }
+    */
 
     public function backupHoursOfOperations($instance){
         // Get Custom Flows and Store in the Database

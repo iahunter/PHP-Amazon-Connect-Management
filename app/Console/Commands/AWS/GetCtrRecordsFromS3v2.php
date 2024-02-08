@@ -23,14 +23,14 @@ use App\Models\CtrBuckets;
 
 use Illuminate\Console\Command;
 
-class GetCtrRecordsFromS3 extends Command
+class GetCtrRecordsFromS3v2 extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'aws:get-ctr-records-from-s3';
+    protected $signature = 'aws:get-ctr-records-from-s3-v2';
 
     /**
      * The console command description.
@@ -59,7 +59,7 @@ class GetCtrRecordsFromS3 extends Command
 
 		$buckets = CtrBuckets::all();
 
-        $buckets = CtrBuckets::where('id', 6)->get();
+        //$buckets = CtrBuckets::where('id', 6)->get();
 
         print_r($buckets); 
 
@@ -101,7 +101,8 @@ class GetCtrRecordsFromS3 extends Command
 			]);
 
 			$lastest = Ctr::get_last_record_from_bucket($bucket);
-
+            print_r($lastest);
+            //die(); 
 			if($lastest){
 				// Trying to speed this up by getting records only after the last record in our DB. 
 				$objects = $s3Client->listObjectsV2([
@@ -128,22 +129,57 @@ class GetCtrRecordsFromS3 extends Command
 			$now = Carbon::now();
 			$cutoff = Carbon::now()->subDays(150);
 
+			//print_r($objects);
+
 			$key_array = []; 
 			$inserts = []; 
 			if(empty($objects['Contents'])){
 				continue; 
 			}
+
+            /*
+            *****************************************************
+            Need to get all the objects if the next token is set.
+            *****************************************************
+            */
+
+            $ctr_array = [];
+
+            $next = 1;
+            while($next){
+                $next = 0; 
+                foreach($objects['Contents'] as $object){
+                    $ctr_array[] = $object; 
+                }
+                if($objects['NextContinuationToken']){
+                    $nexttoken = $objects['NextContinuationToken'];
+                    print "Found next token... Getting addtional Objects".PHP_EOL; 
+                    $objects = $s3Client->listObjectsV2([
+					    'ContinuationToken' => $nexttoken,
+                        'Bucket' => $bucket,
+					    //'Prefix' => 'ctr-', //must have the trailing forward slash "/"
+				    ]);
+                    $next = 1; 
+                }
+            }
+
+            print_r($ctr_array);
+
+
+            /*
+            *****************************************************
+            Need to get all the objects if the next token is set.
+            *****************************************************
+            */
 			
-			foreach ($objects['Contents'] as $object) {
+			//foreach ($objects['Contents'] as $object) {
+            foreach ($ctr_array as $object) {
 				//print_r($object); 
 
 				//die(); 
 				$file_date = $object['LastModified']; 
 				$date = Carbon::parse($file_date); 
 				$date = $date->toDateTimeString(); 
-
-				//print_r($date); 
-
 
 				if($file_date > $cutoff){
 					//print "File is within time window..".PHP_EOL;
@@ -226,7 +262,7 @@ class GetCtrRecordsFromS3 extends Command
 						$array[] = $insert;
 						//die();
 
-						print_r($array); 
+						//print_r($array); 
 						//die();
 						//$result = Ctr::insert($insert);
 						try{

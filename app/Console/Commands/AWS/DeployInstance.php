@@ -909,6 +909,8 @@ END;
 
         $environments = [
             "lab",
+            "dev",
+            "test",
             "prod"
         ];
 

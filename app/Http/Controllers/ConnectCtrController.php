@@ -189,6 +189,24 @@ class ConnectCtrController extends Controller
 		//return DeviceCollection::collection($objects);
     }
 
+    public function ctrByContactId(Request $request, $contact_id)
+    {
+
+        $report = Ctr::where('contact_id', $contact_id)->get(); 
+
+        $response = [
+            'status_code'       => 202,
+            'success'           => true,
+            'message'           => '',
+            'request'           => $request->all(),
+            'result'            => $report,
+        ];
+
+        return response()->json($response);
+
+		//return DeviceCollection::collection($objects);
+    }
+
     /**
      * Show the form for creating a new resource.
      *

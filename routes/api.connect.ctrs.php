@@ -256,4 +256,32 @@ Route::get('/ctrs/{instance}/report/week/', [ConnectCtrController::class, 'weeks
 Route::get('/ctrs/{instance}/report/yesterday/', [ConnectCtrController::class, 'yesterdayCallSummary'])->name('instance.callreport');
 
 
+/**
+ * @OA\Get(
+ *   path="/api/ctrs/get/{contact_id}",
+ *   tags={"CTRs"},
+ *     summary="Get CTR by Contact ID",
+ *     description="",
+ *     @OA\Parameter(
+ *         name="contact_id",
+ *         in="path",
+ *         description="Get Contact by ID",
+ *         required=true,
+ *         @OA\Schema(
+ *             type="string",
+ *         ),
+ *     ),
+ *   @OA\Response(
+ *     response=200,
+ *     description="successful operation"
+ *   ),
+ *	 security={
+ *     {"passport": {}},
+ *   },
+ * )
+ **/
+
+ Route::get('/ctrs/get/{contact_id}', [ConnectCtrController::class, 'ctrByContactId'])->name('instance.callreport');
+
+
 
